@@ -73,7 +73,6 @@ typedef struct {
 
 //#define make_ani(ani_array, delay) { .frames = ani_array, sizeof(ani_array) / sizeof(ani_array[0]), delay, 0., 0 }
 #define make_ani(ani_array, delay) { .frames = ani_array, .num_frames = sizeof(ani_array) / sizeof(ani_array[0]), .duration = delay, .elapsed = 0., .cur_frame = 0 }
-#define make_ani_obj(ani_array_array) {  }
 
 // returns true if animation not yet ended?
 b8 update_animation(Animation *animation, f64 elapsed_delta_sec) {
