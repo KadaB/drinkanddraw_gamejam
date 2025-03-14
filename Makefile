@@ -14,3 +14,6 @@ $(OUT): $(SRC)
 
 clean:
 	rm -rf $(BUILD_DIR) # $(OUT)
+
+run: $(OUT)
+	./$(OUT)
