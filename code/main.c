@@ -45,8 +45,94 @@ typedef struct {
 #define PLAYER_SPEED 200.0f
 #define PLAYER_HALF_DIM 25.0f
 
+SDL_FRect frame_at(v2 grid_coord, v2 spr_dims) {
+  return (SDL_FRect) { spr_dims.x*grid_coord.x,  spr_dims.y*grid_coord.y, spr_dims.x, spr_dims.y};
+}
+
+typedef struct {
+  v2* frames;
+  int max_frame;
+  f64 duration;
+
+  f64 elapsed;
+  int cur_frame;
+} Animation;
+
+
+//#define make_ani(ani_array, delay) { .frames = ani_array, sizeof(ani_array) / sizeof(ani_array[0]), delay, 0., 0 }
+#define make_ani(ani_array, delay) { .frames = ani_array, .max_frame = sizeof(ani_array) / sizeof(ani_array[0]), .duration = delay, .elapsed = 0., .cur_frame = 0 }
+
+
+// was passiert hier?
+void update_animation(Animation *animation, f64 elapsed_delta) {
+  animation->elapsed += elapsed_delta;
+
+  if(animation->elapsed > animation->duration) {
+    animation->cur_frame = (animation->cur_frame + 1) % animation->max_frame;
+    animation->elapsed = 0.f;
+  }
+}
+
+void display_animation(v2 player_pos, Animation *animation, v2 spr_dims, SDL_Texture* spr_tex,  SDL_Renderer *renderer) {
+  SDL_FRect srcRect = frame_at(animation->frames[animation->cur_frame], spr_dims);
+
+  //SDL_Log();
+  //SDL_Log("dt: %g seconds", animation->elapsed);
+
+  SDL_FRect spr_rect = (SDL_FRect) {
+    .x = player_pos.x - PLAYER_HALF_DIM,
+    .y = player_pos.y - PLAYER_HALF_DIM,
+    .w = 50 * 2,
+    .h = 37 * 2
+  };
+
+  SDL_RenderTexture(renderer, spr_tex, &srcRect, &spr_rect);
+}
+
 int main(int argc, char **argv)
 {
+  // anim def
+  v2 batch_limits = {7, 11};  // how many sprites row, cols
+  v2 spr_dims = {50, 37};     // sprite size w, h pixels
+ 
+  //v2   idle1[] = { {0, 0}, {0, 1}, {0, 2}, {0, 3} };
+  v2   idle1[] = { {0, 0}, {1, 0}, {2, 0}, {3, 0} };
+
+  v2  crouch[] = { {0, 4}, {0, 5}, {0, 6}, {1, 0} };
+  v2     run[] = { {1, 1}, {1, 2}, {1, 3}, {1, 4}, {1, 5}, {1, 6} };
+  v2    jump[] = { {2, 0}, {2, 1}, {2, 2}, {2, 3} };
+  v2     mid[] = { {2, 4}, {2, 5}, {2, 6}, {3, 0} };
+  v2    fall[] = { {3, 1}, {3, 2} };
+  v2   slide[] = { {3, 3}, {3, 4}, {3, 5}, {3, 6}, {4, 0} };
+  v2    grab[] = { {4, 1}, {4, 2}, {4, 3}, {4, 4}};
+  v2   climb[] = { {4, 5}, {4, 6}, {5, 0}, {5, 1}, {5, 2} };
+  v2   idle2[] = { {5, 3}, {5, 4}, {5, 5}, {5, 6} };
+  v2 attack1[] = { {6, 0}, {6, 1}, {6, 2}, {6, 3}, {6, 4} };
+  v2 attack2[] = { {6, 5}, {6, 6}, {7, 0}, {7, 1}, {7, 2}, {7, 3} };
+  v2 attack3[] = { {7, 4}, {7, 5}, {7, 6}, {8, 0}, {8, 1}, {8, 2} };
+  v2    hurt[] = { {8, 3}, {8, 4}, {8, 5} };
+  v2     die[] = { {8, 6}, {9, 0}, {9, 1}, {9, 2}, {9, 3}, {9, 4}, {9, 5} };
+  v2   jump2[] = { {9, 6}, {10, 0}, {10, 1} };
+
+  Animation animations[] = {
+    make_ani(idle1, 0.2),
+    make_ani(crouch, 0.2),
+    make_ani(run, 0.2),
+    make_ani(jump, 0.2),
+    make_ani(mid, 0.2),
+    make_ani(fall, 0.2),
+    make_ani(slide, 0.2),
+    make_ani(grab, 0.2),
+    make_ani(climb, 0.2),
+    make_ani(idle2, 0.2),
+    make_ani(attack1, 0.2),
+    make_ani(attack2, 0.2),
+    make_ani(attack3, 0.2),
+    make_ani(hurt, 0.2),
+    make_ani(die, 0.2),
+    make_ani(jump2, 0.2)
+  };
+
   //NOTE(moritz): Initialization
   if (!SDL_Init(SDL_INIT_VIDEO))
   {
@@ -77,6 +163,8 @@ int main(int argc, char **argv)
     SDL_Log("Was not able to set vsync");
   }
 
+  SDL_Texture *spr_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("res/hero.bmp"));
+  
   input previous_input = {0};
   v2 player_pos = {
     .x = 400,
@@ -94,7 +182,7 @@ int main(int argc, char **argv)
     time_stamp_last = time_stamp_now;
     time_stamp_now  = SDL_GetPerformanceCounter();
     dt_for_previous_frame = (f64)((time_stamp_now - time_stamp_last)/(f64)SDL_GetPerformanceFrequency());
-    SDL_Log("dt: %g seconds", dt_for_previous_frame);
+    // SDL_Log("dt: %g seconds", dt_for_previous_frame);
 
     //NOTE(moritz): Events/Input
     input current_input = {0};
@@ -171,7 +259,14 @@ int main(int argc, char **argv)
       .w = 2*PLAYER_HALF_DIM,
       .h = 2*PLAYER_HALF_DIM
     };
-    SDL_RenderFillRect(renderer, &rect);
+
+    update_animation(&animations[0], dt_for_previous_frame);
+
+    if(spr_tex) {
+      display_animation(player_pos, &animations[0], spr_dims, spr_tex, renderer);
+    }
+    else 
+      SDL_RenderFillRect(renderer, &rect);
 
     SDL_RenderPresent(renderer);
   }
