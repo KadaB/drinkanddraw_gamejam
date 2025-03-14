@@ -38,18 +38,8 @@ typedef struct {
   b8 released;
 } button_state;
 
-enum game_buttons
-{
-  LEFT_BUTTON,
-  RIGHT_BUTTON,
-  UP_BUTTON,
-  DOWN_BUTTON,
-
-  BUTTON_COUNT
-};
-
 typedef struct {
-  button_state buttons[BUTTON_COUNT];
+  button_state buttons[SDL_SCANCODE_COUNT];
 } input;
 
 #define PLAYER_SPEED 200.0f
@@ -110,7 +100,7 @@ int main(int argc, char **argv)
     input current_input = {0};
     current_input = previous_input;
 
-    for (s32 idx = 0; idx < BUTTON_COUNT; idx += 1)
+    for (s32 idx = 0; idx < SDL_SCANCODE_COUNT; idx += 1)
     {
       button_state *state = &current_input.buttons[idx];
       state->pressed  = false;
@@ -129,70 +119,21 @@ int main(int argc, char **argv)
 
         case SDL_EVENT_KEY_DOWN:
         {
-          switch(e.key.key)
-          {
-            case SDLK_ESCAPE:
-            {
-              quit = true;
-            } break;
+          int scancode = e.key.scancode;
 
-            case SDLK_LEFT:
-            {
-              current_input.buttons[LEFT_BUTTON].down    = true;
-              current_input.buttons[LEFT_BUTTON].pressed = true;
-            } break;
+          current_input.buttons[scancode].down    = true;
+          current_input.buttons[scancode].pressed = true;
 
-            case SDLK_RIGHT:
-            {
-              current_input.buttons[RIGHT_BUTTON].down    = true;
-              current_input.buttons[RIGHT_BUTTON].pressed = true;
-            } break;
-
-            case SDLK_UP:
-            {
-              current_input.buttons[UP_BUTTON].down    = true;
-              current_input.buttons[UP_BUTTON].pressed = true;
-            } break;
-
-            case SDLK_DOWN:
-            {
-              current_input.buttons[DOWN_BUTTON].down    = true;
-              current_input.buttons[DOWN_BUTTON].pressed = true;
-            } break;
-          }
-        } break;
-
+          if(scancode == SDL_SCANCODE_ESCAPE) quit = true;
+        } break; 
         case SDL_EVENT_KEY_UP:
         {
-          switch(e.key.key)
-          {
-            case SDLK_LEFT:
-            {
-              current_input.buttons[LEFT_BUTTON].down     = false;
-              current_input.buttons[LEFT_BUTTON].released = true;
-            } break;
+          int scancode = e.key.scancode;
 
-            case SDLK_RIGHT:
-            {
-              current_input.buttons[RIGHT_BUTTON].down     = false;
-              current_input.buttons[RIGHT_BUTTON].released = true;
-            } break;
-
-            case SDLK_UP:
-            {
-              current_input.buttons[UP_BUTTON].down     = false;
-              current_input.buttons[UP_BUTTON].released = true;
-            } break;
-
-            case SDLK_DOWN:
-            {
-              current_input.buttons[DOWN_BUTTON].down     = false;
-              current_input.buttons[DOWN_BUTTON].released = true;
-            } break;
+          current_input.buttons[scancode].down     = false;
+          current_input.buttons[scancode].released = true;
           }
         } break;
-
-      }
     }
 
     previous_input = current_input;
@@ -200,13 +141,13 @@ int main(int argc, char **argv)
     //NOTE(moritz):Update game state
     v2 input_direction = {0};
 
-    if (current_input.buttons[LEFT_BUTTON].down)
+    if (current_input.buttons[SDL_SCANCODE_LEFT].down)
       input_direction.x -= 1.0f;
-    if (current_input.buttons[RIGHT_BUTTON].down)
+    if (current_input.buttons[SDL_SCANCODE_RIGHT].down)
       input_direction.x += 1.0f;
-    if (current_input.buttons[UP_BUTTON].down)
+    if (current_input.buttons[SDL_SCANCODE_UP].down)
       input_direction.y -= 1.0f;
-    if (current_input.buttons[DOWN_BUTTON].down)
+    if (current_input.buttons[SDL_SCANCODE_DOWN].down)
       input_direction.y += 1.0f;
 
     f32 one_over_input_length = input_direction.x*input_direction.x + input_direction.y*input_direction.y;
