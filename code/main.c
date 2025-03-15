@@ -72,7 +72,6 @@ SDL_Texture* load_tex_from_png(SDL_Renderer *renderer, const char *filename) {
   return texture;
 }
 
-
 SDL_FRect frame_at(v2 grid_coord, v2 spr_dims) {
   return (SDL_FRect) { spr_dims.x*grid_coord.x,  spr_dims.y*grid_coord.y, spr_dims.x, spr_dims.y};
 }
@@ -139,7 +138,7 @@ int main(int argc, char **argv)
 {
 
   //NOTE(moritz): Initialization
-  if (!SDL_Init(SDL_INIT_VIDEO))
+  if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO))
   {
     SDL_Log("Could not initialize SDL: %s", SDL_GetError());
     return 1;
@@ -199,20 +198,42 @@ int main(int argc, char **argv)
   }
 
   SDL_Texture *bg_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/background.bmp"));
-  SDL_Texture *spawn = load_tex_from_png(renderer, "../res/pngs/item_spawn.png");
-  SDL_Texture *belt = load_tex_from_png(renderer, "../res/pngs/base_production_line.png");
-  SDL_Texture *wheels = load_tex_from_png(renderer, "../res/pngs/circles.png");
+  SDL_Texture *spawn = load_tex_from_png(renderer, "../res/item_spawn.png");
+  SDL_Texture *belt = load_tex_from_png(renderer, "../res/base_production_line.png");
+  SDL_Texture *wheels = load_tex_from_png(renderer, "../res/circles.png");
+
+  // wave things
+  SDL_AudioSpec wave_spec = {0, 0, 0};
+  Uint8 *wave_buf;
+  u32 wave_len;
+  if (!SDL_LoadWAV("../res/engine.wav", &wave_spec, &wave_buf, &wave_len)) {
+    SDL_Log("Audio datei NICHT geladen, weil: %s", SDL_GetError());
+  }
+
+  SDL_AudioStream *audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &wave_spec, NULL, NULL);
+  if (audio_stream == NULL) {
+    SDL_Log("Audio stream nicht erstellt, weil: %s", SDL_GetError());
+  }
+  SDL_ResumeAudioStreamDevice(audio_stream);
+
+  // if (SDL_PutAudioStreamData(audio_stream, wave_buf, wave_len) <0) {
+  //   SDL_Log("Audio datei konnte nicht in stream eigefügt werden, weil: %s", SDL_GetError());
+  // }
 
   u64 time_stamp_now  = SDL_GetPerformanceCounter();
   u64 time_stamp_last = 0;
   f64 dt_for_previous_frame = 0;
-  
+
   //NOTE(moritz): Game loop
   b8 quit = false;
 
   int angle = 0.f;
   while (!quit)
   {
+    if (SDL_GetAudioStreamQueued(audio_stream) < (int) wave_len) {
+      SDL_PutAudioStreamData(audio_stream, wave_buf, wave_len);
+    }
+
     time_stamp_last = time_stamp_now;
     time_stamp_now  = SDL_GetPerformanceCounter();
     dt_for_previous_frame = (f64)((time_stamp_now - time_stamp_last)/(f64)SDL_GetPerformanceFrequency());
@@ -247,7 +268,7 @@ int main(int argc, char **argv)
           current_input.buttons[scancode].pressed = true;
 
           if(scancode == SDL_SCANCODE_ESCAPE) quit = true;
-        } break; 
+        } break;
         case SDL_EVENT_KEY_UP:
         {
           int scancode = e.key.scancode;
@@ -343,6 +364,7 @@ int main(int argc, char **argv)
   SDL_DestroyTexture(belt);
   SDL_DestroyTexture(wheels);
 
+  SDL_free(wave_buf);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(main_window);
   SDL_Quit();
