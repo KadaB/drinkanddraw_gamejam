@@ -172,12 +172,7 @@ void sndplr_play(SoundPlayer *player, b8 loop) {
 
 void sndplr_update(SoundPlayer *player) {
   if (SDL_GetAudioStreamQueued(player->audio_stream) < (int) player->wave_len) {
-    if (player->loop) {
-      SDL_PutAudioStreamData(player->audio_stream, player->wave_buf, player->wave_len);
-    }
-    else {
-      player->paused = true;
-    }
+    SDL_PutAudioStreamData(player->audio_stream, player->wave_buf, player->wave_len);
   }
 }
 
