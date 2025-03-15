@@ -26,6 +26,14 @@ typedef double f64;
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+f64 rand_0_to_1() {
+  return (f64)rand() / RAND_MAX;
+}
+
+f64 rand_minus_one_to_one() {
+  (rand_0_to_1() - 0.5f) * 2.f;
+}
+
 typedef union {
   f32 e[2];
   struct {
@@ -139,8 +147,6 @@ typedef struct {
   SDL_AudioSpec wave_spec;
   Uint8 *wave_buf;
   u32 wave_len;
-  u8 paused;
-  u8 loop;
 } SoundPlayer;
 
 void sndplr_destroy(SoundPlayer *player) {
@@ -164,16 +170,25 @@ b8 sndplr_loadwav(SoundPlayer *player, char *filename) {
   return true;
 }
 
-void sndplr_play(SoundPlayer *player, b8 loop) {
+void sndplr_start(SoundPlayer *player) {
   SDL_ResumeAudioStreamDevice(player->audio_stream);
-  player->loop = loop;
-  player->paused = false;
 }
 
-void sndplr_update(SoundPlayer *player) {
+void sndplr_continue(SoundPlayer *player) {
   if (SDL_GetAudioStreamQueued(player->audio_stream) < (int) player->wave_len) {
     SDL_PutAudioStreamData(player->audio_stream, player->wave_buf, player->wave_len);
   }
+}
+
+void sndplr_stop(SoundPlayer *player) {
+  SDL_PauseAudioStreamDevice(player->audio_stream);
+  SDL_ClearAudioStream(player->audio_stream);
+}
+
+void sndplr_play_once(SoundPlayer *player) {
+  SDL_ClearAudioStream(player->audio_stream);
+  SDL_PutAudioStreamData(player->audio_stream, player->wave_buf, player->wave_len);
+  SDL_ResumeAudioStreamDevice(player->audio_stream);
 }
 
 int main(int argc, char **argv)
@@ -246,7 +261,10 @@ int main(int argc, char **argv)
 
   SoundPlayer engine_snd;
   sndplr_loadwav(&engine_snd, "../res/engine.wav");
-  sndplr_play(&engine_snd, false);
+  sndplr_start(&engine_snd);
+
+  SoundPlayer lazer_snd;
+  sndplr_loadwav(&lazer_snd, "../res/lazer.wav");
 
   u64 time_stamp_now  = SDL_GetPerformanceCounter();
   u64 time_stamp_last = 0;
@@ -263,7 +281,7 @@ int main(int argc, char **argv)
     dt_for_previous_frame = (f64)((time_stamp_now - time_stamp_last)/(f64)SDL_GetPerformanceFrequency());
     // SDL_Log("dt: %g seconds", dt_for_previous_frame);
 
-    sndplr_update(&engine_snd);
+    sndplr_continue(&engine_snd);
     //NOTE(moritz): Events/Input
     input current_input = {0};
     current_input = previous_input;
@@ -317,6 +335,9 @@ int main(int argc, char **argv)
       input_direction.y -= 1.0f;
     if (current_input.buttons[SDL_SCANCODE_DOWN].down)
       input_direction.y += 1.0f;
+    if (current_input.buttons[SDL_SCANCODE_RETURN].down) {
+      sndplr_play_once(&lazer_snd);
+    }
 
     f32 one_over_input_length = input_direction.x*input_direction.x + input_direction.y*input_direction.y;
     if (one_over_input_length != 0.0)
@@ -384,6 +405,7 @@ int main(int argc, char **argv)
   }
 
   sndplr_destroy(&engine_snd);
+  sndplr_destroy(&lazer_snd);
 
   SDL_DestroyTexture(ani_obj.spr_tex);
   SDL_DestroyTexture(bg_tex);
