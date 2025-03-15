@@ -167,7 +167,7 @@ int main(int argc, char **argv)
     .num_anis = LEN(animations),
     .cur_animation = 1,
     .position = &player_pos,
-    .spr_dims = {354, 352},
+    .spr_dims = {364, 352},
     .spr_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/cat_animation_hit.bmp")),
   };
 
