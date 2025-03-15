@@ -79,7 +79,7 @@ b8 update_animation(Animation *animation, f64 elapsed_delta_sec) {
 
   if(animation->elapsed > animation->duration) {
     animation->cur_frame++;
-    if(animation->cur_frame > animation->num_frames) animation->cur_frame = 0;
+    if(animation->cur_frame >= animation->num_frames) animation->cur_frame = 0;
     animation->elapsed = 0.f;
     return false;
   }
@@ -89,7 +89,7 @@ b8 update_animation(Animation *animation, f64 elapsed_delta_sec) {
 
 void update_animated_object(AnimatedObject* ani_obj, f64 elapsed_delta_sec) {
   if(!update_animation(&ani_obj->animations[ani_obj->cur_animation], elapsed_delta_sec)) {
-    //ani_obj->cur_animation = (ani_obj->cur_animation+1) % 16;//ani_obj->num_anis;
+    //ani_obj->cur_animation = (ani_obj->cur_animation+1) % ani_obj->num_anis;
   }
 }
 
@@ -97,10 +97,10 @@ void display_animation(v2 player_pos, Animation *animation, v2 spr_dims, SDL_Tex
   SDL_FRect srcRect = frame_at(animation->frames[animation->cur_frame], spr_dims);
 
   SDL_FRect spr_rect = (SDL_FRect) {
-    .x = player_pos.x - PLAYER_HALF_DIM,
-    .y = player_pos.y - PLAYER_HALF_DIM,
-    .w = 50 * 3,
-    .h = 37 * 3
+    .x = player_pos.x - spr_dims.x/2,
+    .y = player_pos.y - spr_dims.y/2,
+    .w = spr_dims.x,
+    .h = spr_dims.y
   };
 
   SDL_RenderTexture(renderer, spr_tex, &srcRect, &spr_rect);
@@ -112,49 +112,6 @@ void display_animated_object(AnimatedObject* ani_obj, SDL_Renderer *renderer) {
 
 int main(int argc, char **argv)
 {
-  // anim def
-  v2 batch_limits = {7, 11};  // how many sprites row, cols
-  v2 spr_dims = {50, 37};     // sprite size w, h pixels
-
-  v2   idle1[] = { {0, 0}, {1, 0}, {2, 0}, {3, 0} };
-  v2  crouch[] = { {4, 0}, {5, 0}, {6, 0}, {0, 1} };
-  v2     run[] = { {1, 1}, {2, 1}, {3, 1}, {4, 1}, {5, 1}, {6, 1} };
-  v2    jump[] = { {0, 2}, {1, 2}, {2, 2}, {3, 2} };
-  v2     mid[] = { {4, 2}, {5, 2}, {6, 2}, {0, 3} };
-  v2    fall[] = { {1, 3}, {2, 3} };
-  v2   slide[] = { {3, 3}, {4, 3}, {5, 3}, {6, 3}, {0, 4} };
-  v2    grab[] = { {1, 4}, {2, 4}, {3, 4}, {4, 4} };
-  v2   climb[] = { {5, 4}, {6, 4}, {0, 5}, {1, 5}, {2, 5} };
-  v2   idle2[] = { {3, 5}, {4, 5}, {5, 5}, {6, 5} };
-  v2 attack1[] = { {0, 6}, {1, 6}, {2, 6}, {3, 6}, {4, 6} };
-  v2 attack2[] = { {5, 6}, {6, 6}, {0, 7}, {1, 7}, {2, 7}, {3, 7} };
-  v2 attack3[] = { {4, 7}, {5, 7}, {6, 7}, {0, 8}, {1, 8}, {2, 8} };
-  v2    hurt[] = { {3, 8}, {4, 8}, {5, 8} };
-  v2     die[] = { {6, 8}, {0, 9}, {1, 9}, {2, 9}, {3, 9}, {4, 9}, {5, 9} };
-  v2   jump2[] = { {6, 9}, {0, 10}, {1, 10} };
-
-  Animation animations[] = {
-    make_ani(idle1, .6),
-    make_ani(crouch, .6),
-    make_ani(run, .6),
-    make_ani(jump, .6),
-    make_ani(mid, .6),
-    make_ani(fall, .6),
-    make_ani(slide, .6),
-    make_ani(grab, .6),
-    make_ani(climb, .6),
-    make_ani(idle2, .6),
-    make_ani(attack1, .6),
-    make_ani(attack2, .6),
-    make_ani(attack3, .6),
-    make_ani(hurt, .6),
-    make_ani(die, .6),
-    make_ani(jump2, .6)
-  };
-  
-  for(int i = 0; i < sizeof(animations)/sizeof(animations[0]); ++i) {
-    SDL_Log("animation %d: num of frames: %d",i, animations[i].num_frames);
-  }
 
   //NOTE(moritz): Initialization
   if (!SDL_Init(SDL_INIT_VIDEO))
@@ -187,26 +144,40 @@ int main(int argc, char **argv)
   }
 
 
-  SDL_Texture *spr_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/hero.bmp"));
-  SDL_Texture *bg_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/background.bmp"));
-
   input previous_input = {0};
+
   v2 player_pos = {
     .x = 400,
     .y = 300
   };
 
+  v2   idle1[] = { {0, 0} };
+  v2 attack1[] = { {0, 0}, {1, 0}, {2, 0} };
+
+  Animation animations[] = {
+    make_ani(idle1, .6),
+    make_ani(attack1, .6),
+  };
 
   AnimatedObject ani_obj = {
     .animations = animations,
-    .num_anis = sizeof(animations) / sizeof(animations[0]),
-    .cur_animation = 11,
+    .num_anis = LEN(animations),
+    .cur_animation = 1,
     .position = &player_pos,
-    .spr_dims = {50,37},
-    .spr_tex = spr_tex, 
+    .spr_dims = {354, 352},
+    .spr_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/cat_animation_hit.bmp")),
   };
 
   SDL_Log("Num anis: %d", ani_obj.num_anis);
+  for(int i = 0; i < ani_obj.num_anis; ++i) {
+    SDL_Log("animation %d: num of frames: %d",i, animations[i].num_frames);
+  }
+
+  SDL_Texture *bg_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/background.bmp"));
+  SDL_Texture *spawn = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/item_spawn.bmp"));
+  SDL_Texture *belt = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/base_production_line.bmp"));
+  SDL_Texture *wheels = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/circles.bmp"));
+
 
   u64 time_stamp_now  = SDL_GetPerformanceCounter();
   u64 time_stamp_last = 0;
@@ -214,6 +185,8 @@ int main(int argc, char **argv)
   
   //NOTE(moritz): Game loop
   b8 quit = false;
+
+  int angle = 0.f;
   while (!quit)
   {
     time_stamp_last = time_stamp_now;
@@ -286,27 +259,56 @@ int main(int argc, char **argv)
     player_pos.y += input_direction.y*PLAYER_SPEED*dt_for_previous_frame;
 
     //NOTE(moritz): Drawing
-    SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-    SDL_RenderClear(renderer);
-    SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    if (bg_tex) {
+      SDL_RenderTexture(renderer, bg_tex, NULL, NULL);
+    }
+    else {
+      SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+      SDL_RenderClear(renderer);
+    }
 
-    SDL_FRect rect = (SDL_FRect){
-      .x = player_pos.x - PLAYER_HALF_DIM,
-      .y = player_pos.y - PLAYER_HALF_DIM,
-      .w = 2*PLAYER_HALF_DIM,
-      .h = 2*PLAYER_HALF_DIM
-    };
-
-    if (bg_tex) SDL_RenderTexture(renderer, bg_tex, NULL, NULL);
-
-    if(spr_tex) {
+    if(ani_obj.spr_tex) {
       //update_animation(&animations[0], dt_for_previous_frame);
       //display_animation(player_pos, &animations[0], spr_dims, spr_tex, renderer);
       update_animated_object(&ani_obj, dt_for_previous_frame);
       display_animated_object(&ani_obj, renderer);
     }
-    else 
+    else {
+      SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+      SDL_FRect rect = (SDL_FRect){
+        .x = player_pos.x - PLAYER_HALF_DIM,
+        .y = player_pos.y - PLAYER_HALF_DIM,
+        .w = 2*PLAYER_HALF_DIM,
+        .h = 2*PLAYER_HALF_DIM
+      };
       SDL_RenderFillRect(renderer, &rect);
+    }
+
+    if (belt) {
+      SDL_RenderTexture(renderer, belt, NULL, &(SDL_FRect){0, 890, belt->w, belt->h});
+    }
+    else {
+      SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+      SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 1920, 205});
+    }
+
+    if (spawn) {
+      SDL_RenderTexture(renderer, spawn, NULL, &(SDL_FRect){1820 - (spawn->w/2), -275, spawn->w, spawn->h});
+    }
+    else {
+      SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+      SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 400, 400});
+    }
+
+    if (wheels) {
+      SDL_FPoint center = {wheels->w/2, wheels->h/2};
+      angle += 180. * dt_for_previous_frame;
+      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*2, 908, wheels->w, wheels->h}, angle, &center, SDL_FLIP_NONE);
+      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*4, 908, wheels->w, wheels->h}, angle, &center, SDL_FLIP_NONE);
+
+      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*12, 908, wheels->w, wheels->h},angle, &center, SDL_FLIP_NONE);
+      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*14, 908, wheels->w, wheels->h}, angle, &center, SDL_FLIP_NONE);
+    }
 
     SDL_RenderPresent(renderer);
   }
