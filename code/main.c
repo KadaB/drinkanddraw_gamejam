@@ -51,6 +51,28 @@ typedef struct {
 #define make_ani(ani_array, delay) { .frames = ani_array, .num_frames = sizeof(ani_array) / sizeof(ani_array[0]), .duration = delay, .elapsed = 0., .cur_frame = 0 }
 #define LEN(arr) (sizeof(arr) / sizeof(arr[0]))
 
+SDL_Texture* load_tex_from_png(SDL_Renderer *renderer, const char *filename) {
+  int width, height, channels;
+  unsigned char *data = stbi_load(filename, &width, &height, &channels, 4); // 4 = RGBA
+  if (!data) {
+    SDL_Log("%s nicht geladen, weil %s", filename, stbi_failure_reason());
+    return NULL;
+  }
+
+  SDL_Texture *texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_STATIC, width, height);
+  if (!texture) {
+    SDL_Log("Texture konnte nicht erstellt werden für %s. Fehler: %s\n", filename, SDL_GetError());
+    stbi_image_free(data);
+    return NULL;
+  }
+
+  SDL_UpdateTexture(texture, NULL, data, width * 4);
+  stbi_image_free(data);
+
+  return texture;
+}
+
+
 SDL_FRect frame_at(v2 grid_coord, v2 spr_dims) {
   return (SDL_FRect) { spr_dims.x*grid_coord.x,  spr_dims.y*grid_coord.y, spr_dims.x, spr_dims.y};
 }
@@ -168,7 +190,7 @@ int main(int argc, char **argv)
     .cur_animation = 1,
     .position = &player_pos,
     .spr_dims = {364, 352},
-    .spr_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/cat_animation_hit.bmp")),
+    .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_hit.png"),
   };
 
   SDL_Log("Num anis: %d", ani_obj.num_anis);
@@ -177,10 +199,9 @@ int main(int argc, char **argv)
   }
 
   SDL_Texture *bg_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/background.bmp"));
-  SDL_Texture *spawn = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/item_spawn.bmp"));
-  SDL_Texture *belt = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/base_production_line.bmp"));
-  SDL_Texture *wheels = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/circles.bmp"));
-
+  SDL_Texture *spawn = load_tex_from_png(renderer, "../res/pngs/item_spawn.png");
+  SDL_Texture *belt = load_tex_from_png(renderer, "../res/pngs/base_production_line.png");
+  SDL_Texture *wheels = load_tex_from_png(renderer, "../res/pngs/circles.png");
 
   u64 time_stamp_now  = SDL_GetPerformanceCounter();
   u64 time_stamp_last = 0;
@@ -315,6 +336,12 @@ int main(int argc, char **argv)
 
     SDL_RenderPresent(renderer);
   }
+
+  SDL_DestroyTexture(ani_obj.spr_tex);
+  SDL_DestroyTexture(bg_tex);
+  SDL_DestroyTexture(spawn);
+  SDL_DestroyTexture(belt);
+  SDL_DestroyTexture(wheels);
 
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(main_window);
