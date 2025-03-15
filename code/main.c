@@ -45,8 +45,8 @@ typedef struct {
   button_state buttons[SDL_SCANCODE_COUNT];
 } input;
 
-#define PLAYER_SPEED 200.0f
-#define PLAYER_HALF_DIM 25.0f
+#define sndplr_SPEED 200.0f
+#define sndplr_HALF_DIM 25.0f
 
 #define make_ani(ani_array, delay) { .frames = ani_array, .num_frames = sizeof(ani_array) / sizeof(ani_array[0]), .duration = delay, .elapsed = 0., .cur_frame = 0 }
 #define LEN(arr) (sizeof(arr) / sizeof(arr[0]))
@@ -117,12 +117,12 @@ void update_animated_object(AnimatedObject* ani_obj, f64 elapsed_delta_sec) {
   }
 }
 
-void display_animation(v2 player_pos, Animation *animation, v2 spr_dims, SDL_Texture* spr_tex,  SDL_Renderer *renderer) {
+void display_animation(v2 sndplr_pos, Animation *animation, v2 spr_dims, SDL_Texture* spr_tex,  SDL_Renderer *renderer) {
   SDL_FRect srcRect = frame_at(animation->frames[animation->cur_frame], spr_dims);
 
   SDL_FRect spr_rect = (SDL_FRect) {
-    .x = player_pos.x - spr_dims.x/2,
-    .y = player_pos.y - spr_dims.y/2,
+    .x = sndplr_pos.x - spr_dims.x/2,
+    .y = sndplr_pos.y - spr_dims.y/2,
     .w = spr_dims.x,
     .h = spr_dims.y
   };
@@ -132,6 +132,53 @@ void display_animation(v2 player_pos, Animation *animation, v2 spr_dims, SDL_Tex
 
 void display_animated_object(AnimatedObject* ani_obj, SDL_Renderer *renderer) {
   display_animation(*ani_obj->position, &ani_obj->animations[ani_obj->cur_animation], ani_obj->spr_dims, ani_obj->spr_tex, renderer);
+}
+
+typedef struct {
+  SDL_AudioStream *audio_stream;
+  SDL_AudioSpec wave_spec;
+  Uint8 *wave_buf;
+  u32 wave_len;
+  u8 paused;
+  u8 loop;
+} SoundPlayer;
+
+void sndplr_destroy(SoundPlayer *player) {
+  SDL_free(player->wave_buf);
+  SDL_zerop(player);
+}
+
+b8 sndplr_loadwav(SoundPlayer *player, char *filename) {
+  SDL_AudioSpec wave_spec = {0, 0, 0};
+  if (!SDL_LoadWAV(filename, &wave_spec, &player->wave_buf, &player->wave_len)) {
+    SDL_Log("Audio datei NICHT geladen, weil: %s", SDL_GetError());
+    return false;
+  }
+
+  player->audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &wave_spec, NULL, NULL);
+  if (player->audio_stream == NULL) {
+    SDL_Log("Audio stream nicht erstellt, weil: %s", SDL_GetError());
+    return false;
+  }
+
+  return true;
+}
+
+void sndplr_play(SoundPlayer *player, b8 loop) {
+  SDL_ResumeAudioStreamDevice(player->audio_stream);
+  player->loop = loop;
+  player->paused = false;
+}
+
+void sndplr_update(SoundPlayer *player) {
+  if (SDL_GetAudioStreamQueued(player->audio_stream) < (int) player->wave_len) {
+    if (player->loop) {
+      SDL_PutAudioStreamData(player->audio_stream, player->wave_buf, player->wave_len);
+    }
+    else {
+      player->paused = true;
+    }
+  }
 }
 
 int main(int argc, char **argv)
@@ -170,7 +217,7 @@ int main(int argc, char **argv)
 
   input previous_input = {0};
 
-  v2 player_pos = {
+  v2 sndplr_pos = {
     .x = 400,
     .y = 300
   };
@@ -187,7 +234,7 @@ int main(int argc, char **argv)
     .animations = animations,
     .num_anis = LEN(animations),
     .cur_animation = 1,
-    .position = &player_pos,
+    .position = &sndplr_pos,
     .spr_dims = {364, 352},
     .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_hit.png"),
   };
@@ -202,23 +249,9 @@ int main(int argc, char **argv)
   SDL_Texture *belt = load_tex_from_png(renderer, "../res/base_production_line.png");
   SDL_Texture *wheels = load_tex_from_png(renderer, "../res/circles.png");
 
-  // wave things
-  SDL_AudioSpec wave_spec = {0, 0, 0};
-  Uint8 *wave_buf;
-  u32 wave_len;
-  if (!SDL_LoadWAV("../res/engine.wav", &wave_spec, &wave_buf, &wave_len)) {
-    SDL_Log("Audio datei NICHT geladen, weil: %s", SDL_GetError());
-  }
-
-  SDL_AudioStream *audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &wave_spec, NULL, NULL);
-  if (audio_stream == NULL) {
-    SDL_Log("Audio stream nicht erstellt, weil: %s", SDL_GetError());
-  }
-  SDL_ResumeAudioStreamDevice(audio_stream);
-
-  // if (SDL_PutAudioStreamData(audio_stream, wave_buf, wave_len) <0) {
-  //   SDL_Log("Audio datei konnte nicht in stream eigefügt werden, weil: %s", SDL_GetError());
-  // }
+  SoundPlayer engine_snd;
+  sndplr_loadwav(&engine_snd, "../res/engine.wav");
+  sndplr_play(&engine_snd, false);
 
   u64 time_stamp_now  = SDL_GetPerformanceCounter();
   u64 time_stamp_last = 0;
@@ -230,15 +263,12 @@ int main(int argc, char **argv)
   int angle = 0.f;
   while (!quit)
   {
-    if (SDL_GetAudioStreamQueued(audio_stream) < (int) wave_len) {
-      SDL_PutAudioStreamData(audio_stream, wave_buf, wave_len);
-    }
-
     time_stamp_last = time_stamp_now;
     time_stamp_now  = SDL_GetPerformanceCounter();
     dt_for_previous_frame = (f64)((time_stamp_now - time_stamp_last)/(f64)SDL_GetPerformanceFrequency());
     // SDL_Log("dt: %g seconds", dt_for_previous_frame);
 
+    sndplr_update(&engine_snd);
     //NOTE(moritz): Events/Input
     input current_input = {0};
     current_input = previous_input;
@@ -300,8 +330,8 @@ int main(int argc, char **argv)
     input_direction.x *= one_over_input_length;
     input_direction.y *= one_over_input_length;
 
-    player_pos.x += input_direction.x*PLAYER_SPEED*dt_for_previous_frame;
-    player_pos.y += input_direction.y*PLAYER_SPEED*dt_for_previous_frame;
+    sndplr_pos.x += input_direction.x*sndplr_SPEED*dt_for_previous_frame;
+    sndplr_pos.y += input_direction.y*sndplr_SPEED*dt_for_previous_frame;
 
     //NOTE(moritz): Drawing
     if (bg_tex) {
@@ -314,17 +344,17 @@ int main(int argc, char **argv)
 
     if(ani_obj.spr_tex) {
       //update_animation(&animations[0], dt_for_previous_frame);
-      //display_animation(player_pos, &animations[0], spr_dims, spr_tex, renderer);
+      //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
       update_animated_object(&ani_obj, dt_for_previous_frame);
       display_animated_object(&ani_obj, renderer);
     }
     else {
       SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
       SDL_FRect rect = (SDL_FRect){
-        .x = player_pos.x - PLAYER_HALF_DIM,
-        .y = player_pos.y - PLAYER_HALF_DIM,
-        .w = 2*PLAYER_HALF_DIM,
-        .h = 2*PLAYER_HALF_DIM
+        .x = sndplr_pos.x - sndplr_HALF_DIM,
+        .y = sndplr_pos.y - sndplr_HALF_DIM,
+        .w = 2*sndplr_HALF_DIM,
+        .h = 2*sndplr_HALF_DIM
       };
       SDL_RenderFillRect(renderer, &rect);
     }
@@ -358,13 +388,14 @@ int main(int argc, char **argv)
     SDL_RenderPresent(renderer);
   }
 
+  sndplr_destroy(&engine_snd);
+
   SDL_DestroyTexture(ani_obj.spr_tex);
   SDL_DestroyTexture(bg_tex);
   SDL_DestroyTexture(spawn);
   SDL_DestroyTexture(belt);
   SDL_DestroyTexture(wheels);
 
-  SDL_free(wave_buf);
   SDL_DestroyRenderer(renderer);
   SDL_DestroyWindow(main_window);
   SDL_Quit();
