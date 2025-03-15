@@ -45,6 +45,9 @@ typedef struct {
 #define PLAYER_SPEED 200.0f
 #define PLAYER_HALF_DIM 25.0f
 
+#define make_ani(ani_array, delay) { .frames = ani_array, .num_frames = sizeof(ani_array) / sizeof(ani_array[0]), .duration = delay, .elapsed = 0., .cur_frame = 0 }
+#define LEN(arr) (sizeof(arr) / sizeof(arr[0]))
+
 SDL_FRect frame_at(v2 grid_coord, v2 spr_dims) {
   return (SDL_FRect) { spr_dims.x*grid_coord.x,  spr_dims.y*grid_coord.y, spr_dims.x, spr_dims.y};
 }
@@ -69,10 +72,6 @@ typedef struct {
   v2 spr_dims;
   SDL_Texture *spr_tex;
 } AnimatedObject;
-
-
-//#define make_ani(ani_array, delay) { .frames = ani_array, sizeof(ani_array) / sizeof(ani_array[0]), delay, 0., 0 }
-#define make_ani(ani_array, delay) { .frames = ani_array, .num_frames = sizeof(ani_array) / sizeof(ani_array[0]), .duration = delay, .elapsed = 0., .cur_frame = 0 }
 
 // returns true if animation not yet ended?
 b8 update_animation(Animation *animation, f64 elapsed_delta_sec) {
@@ -135,22 +134,22 @@ int main(int argc, char **argv)
   v2   jump2[] = { {6, 9}, {0, 10}, {1, 10} };
 
   Animation animations[] = {
-    make_ani(idle1, 1.2),
-    make_ani(crouch, 1.2),
-    make_ani(run, 1.2),
-    make_ani(jump, 1.2),
-    make_ani(mid, 1.2),
-    make_ani(fall, 1.2),
-    make_ani(slide, 1.2),
-    make_ani(grab, 1.2),
-    make_ani(climb, 1.2),
-    make_ani(idle2, 1.2),
-    make_ani(attack1, 1.2),
-    make_ani(attack2, 1.2),
-    make_ani(attack3, 1.2),
-    make_ani(hurt, 1.2),
-    make_ani(die, 1.2),
-    make_ani(jump2, 1.2)
+    make_ani(idle1, .6),
+    make_ani(crouch, .6),
+    make_ani(run, .6),
+    make_ani(jump, .6),
+    make_ani(mid, .6),
+    make_ani(fall, .6),
+    make_ani(slide, .6),
+    make_ani(grab, .6),
+    make_ani(climb, .6),
+    make_ani(idle2, .6),
+    make_ani(attack1, .6),
+    make_ani(attack2, .6),
+    make_ani(attack3, .6),
+    make_ani(hurt, .6),
+    make_ani(die, .6),
+    make_ani(jump2, .6)
   };
   
   for(int i = 0; i < sizeof(animations)/sizeof(animations[0]); ++i) {
@@ -165,8 +164,8 @@ int main(int argc, char **argv)
   }
 
   SDL_Window *main_window = SDL_CreateWindow("SDL Window",
-                                             800,
-                                             600,
+                                             1920,
+                                             1080,
                                              0);
   if (!main_window)
   {
@@ -187,8 +186,10 @@ int main(int argc, char **argv)
     SDL_Log("Was not able to set vsync");
   }
 
-  SDL_Texture *spr_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("res/hero.bmp"));
-  
+
+  SDL_Texture *spr_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/hero.bmp"));
+  SDL_Texture *bg_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/background.bmp"));
+
   input previous_input = {0};
   v2 player_pos = {
     .x = 400,
@@ -199,7 +200,7 @@ int main(int argc, char **argv)
   AnimatedObject ani_obj = {
     .animations = animations,
     .num_anis = sizeof(animations) / sizeof(animations[0]),
-    .cur_animation = 14,
+    .cur_animation = 11,
     .position = &player_pos,
     .spr_dims = {50,37},
     .spr_tex = spr_tex, 
@@ -287,8 +288,8 @@ int main(int argc, char **argv)
     //NOTE(moritz): Drawing
     SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
     SDL_RenderClear(renderer);
-
     SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+
     SDL_FRect rect = (SDL_FRect){
       .x = player_pos.x - PLAYER_HALF_DIM,
       .y = player_pos.y - PLAYER_HALF_DIM,
@@ -296,6 +297,7 @@ int main(int argc, char **argv)
       .h = 2*PLAYER_HALF_DIM
     };
 
+    if (bg_tex) SDL_RenderTexture(renderer, bg_tex, NULL, NULL);
 
     if(spr_tex) {
       //update_animation(&animations[0], dt_for_previous_frame);
