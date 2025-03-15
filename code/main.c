@@ -23,6 +23,9 @@ typedef double f64;
 //TODO(moritz): Use HandmadeMath.h instead of doing our own math stuff?
 // https://github.com/HandmadeMath/HandmadeMath
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 typedef union {
   f32 e[2];
   struct {
