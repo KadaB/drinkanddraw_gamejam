@@ -31,7 +31,7 @@ f64 rand_0_to_1() {
 }
 
 f64 rand_minus_one_to_one() {
-  (rand_0_to_1() - 0.5f) * 2.f;
+  return (rand_0_to_1() - 0.5f) * 2.f;
 }
 
 typedef union {
