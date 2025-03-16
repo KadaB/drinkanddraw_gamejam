@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <time.h>
 
 typedef int8_t  s8;
 typedef int16_t s16;
@@ -104,7 +105,6 @@ enum PROP_STATE {
 
 typedef struct {
   int hp;
-  v2* frames;
   enum PROP_STATE broken;
   SDL_Texture* texture;
   v2 frame_dims;
@@ -307,22 +307,24 @@ enum PropLvl {
 
 #define ENM_RAND_RNG(startenm, endenm) (assert((startenm) < (endenm)), (startenm) + (rand() % ((endenm) - (startenm))))
 // lvl from 0 to 2
-Prop rands_prop(enum PropLvl lvl, SDL_Texture** prop_texture_list) {
-
+Prop create_prop_rand(enum PropLvl lvl, SDL_Texture** prop_texture_list) {
   enum PropType type;
   if (lvl == SMALL) {
-    type = ENM_RAND_RNG(DUCK, FLOWER);
+    int rnd = rand();
+    type = DUCK + rand() % (FLOWER - DUCK);//ENM_RAND_RNG(DUCK, FLOWER);
+    SDL_Log("Rand: %d", rnd);
+    SDL_Log("range: %d", (FLOWER - DUCK));
+    SDL_Log("Type nr: %d", type);
   } else if (lvl == MEDIUM) {
     type = ENM_RAND_RNG(LAMP, PLANT);
   } else if (lvl == LARGE) {
     type = ENM_RAND_RNG(STATUE, BEAR);
   }
-  v2 prop_frames[] = { {0, 0}, {1, 0} };
-  v2 start_pos = {0, 1000};
+
+  v2 start_pos = {1000, 1000};
   SDL_Texture* spr_tex = prop_texture_list[type];
   Prop prop = {
     .hp = lvl + 1,
-    .frames =  prop_frames,
     .broken = (rand() % 2) == 0 ? false : true,
     .texture = spr_tex,
     .frame_dims = {spr_tex->w / 2, spr_tex->h},
@@ -330,6 +332,20 @@ Prop rands_prop(enum PropLvl lvl, SDL_Texture** prop_texture_list) {
   };
 
   return prop;
+}
+
+void display_prop(Prop *prop, SDL_Renderer *renderer) {
+  SDL_FRect srcRect = frame_at((v2) {prop->broken == BROKEN ? 1. : 0.}, prop->frame_dims);
+
+
+  SDL_FRect spr_rect = (SDL_FRect) {
+    .x = prop->position.x - prop->frame_dims.x/2,
+    .y = prop->position.y - prop->frame_dims.y,
+    .w = prop->frame_dims.x,
+    .h = prop->frame_dims.y
+  };
+
+  SDL_RenderTexture(renderer, prop->texture, &srcRect, &spr_rect);
 }
 
 int main(int argc, char **argv)
@@ -486,7 +502,8 @@ int main(int argc, char **argv)
   int angle = 0.f;
   f32 dot_shift = 0;
 
-
+  Prop myprop = create_prop_rand(0, prop_textures);
+  // before main loop
   while (!quit)
   {
     time_stamp_last = time_stamp_now;
@@ -535,6 +552,13 @@ int main(int argc, char **argv)
     }
 
     previous_input = current_input;
+
+    if (current_input.buttons[SDL_SCANCODE_LEFT].down)
+      myprop = create_prop_rand(0, prop_textures);
+    if (current_input.buttons[SDL_SCANCODE_DOWN].down)
+      myprop = create_prop_rand(1, prop_textures);
+    if (current_input.buttons[SDL_SCANCODE_RIGHT].down)
+      myprop = create_prop_rand(2, prop_textures);
 
     //NOTE(moritz):Update game state
     v2 input_direction = {0};
@@ -640,6 +664,9 @@ int main(int argc, char **argv)
       SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
       SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 1920, 205});
     }
+
+    display_prop(&myprop, renderer);
+    // last z
 
     SDL_RenderPresent(renderer);
   }
