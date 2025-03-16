@@ -109,6 +109,7 @@ typedef struct {
   SDL_Texture* texture;
   v2 frame_dims;
   v2 position;
+  bool alive;
 } Prop;
 
 enum {
@@ -321,14 +322,15 @@ Prop create_prop_rand(enum PropLvl lvl, SDL_Texture** prop_texture_list) {
     type = ENM_RAND_RNG(STATUE, BEAR);
   }
 
-  v2 start_pos = {1000, 1000};
+  v2 start_pos = {1900, 940};
   SDL_Texture* spr_tex = prop_texture_list[type];
   Prop prop = {
     .hp = lvl + 1,
     .broken = (rand() % 2) == 0 ? false : true,
     .texture = spr_tex,
     .frame_dims = {spr_tex->w / 2, spr_tex->h},
-    .position = start_pos
+    .position = start_pos,
+    .alive = true
   };
 
   return prop;
@@ -502,6 +504,17 @@ int main(int argc, char **argv)
   int angle = 0.f;
   f32 dot_shift = 0;
 
+  // spawn settings
+  f64 spawn_timout_sec_min = 1; // sec
+  f64 spawn_timout_sec_max = 3; // sec
+  f64 cur_spawn_timeout;
+  f64 spawn_elapsed;
+
+  const int prop_spawn_limit = 20;
+  Prop prop_list[prop_spawn_limit];
+  for (int i = 0; i < prop_spawn_limit; ++i) prop_list[i] = (Prop){.alive =  false};
+  int num_props_alive = 0;
+
   Prop myprop = create_prop_rand(0, prop_textures);
   // before main loop
   while (!quit)
@@ -510,6 +523,23 @@ int main(int argc, char **argv)
     time_stamp_now  = SDL_GetPerformanceCounter();
     dt_for_previous_frame = (f64)((time_stamp_now - time_stamp_last)/(f64)SDL_GetPerformanceFrequency());
     // SDL_Log("dt: %g seconds", dt_for_previous_frame);
+
+    // spawn behavior
+    spawn_elapsed += dt_for_previous_frame;
+    if (spawn_elapsed > cur_spawn_timeout) {
+      spawn_elapsed = 0.;
+      cur_spawn_timeout = spawn_timout_sec_min + (spawn_timout_sec_max - spawn_timout_sec_min)*rand_0_to_1();
+      if (num_props_alive < prop_spawn_limit) {
+        int free_spot = -1;
+        for (int i = 0; i < prop_spawn_limit; ++i )
+          if (prop_list[i].alive == false) free_spot = i;
+
+        if (free_spot > -1 && free_spot < prop_spawn_limit) {
+          prop_list[free_spot] = create_prop_rand(0, prop_textures);
+          num_props_alive++;
+        }
+      }
+    }
 
     //NOTE(moritz): Events/Input
     Input current_input = {0};
@@ -621,6 +651,18 @@ int main(int argc, char **argv)
 
     // item placing
 
+    for (int i = 0; i < prop_spawn_limit; ++i) {
+      Prop *prop = &prop_list[i];
+      if (prop->alive) {
+        prop->position.x -= dt_for_previous_frame * 300;
+        display_prop(prop, renderer);
+        if (prop->position.x < 0) {
+          prop->alive = false;
+          num_props_alive--;
+        }
+      }
+    }
+
     if (spawn) {
       SDL_RenderTexture(renderer, spawn, NULL, &(SDL_FRect){0, 0, spawn->w, spawn->h});
     }
@@ -665,8 +707,7 @@ int main(int argc, char **argv)
       SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 1920, 205});
     }
 
-    display_prop(&myprop, renderer);
-    // last z
+    // last z, end of z, end of order
 
     SDL_RenderPresent(renderer);
   }
