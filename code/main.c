@@ -26,6 +26,9 @@ typedef double f64;
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#define MIN(a, b) (a) < (b) ? a : b
+#define MAX(a, b) (a) > (b) ? a : b
+
 f64 rand_0_to_1() {
   return (f64)rand() / RAND_MAX;
 }
@@ -47,14 +50,15 @@ typedef struct {
   b8 down;
   b8 pressed;
   b8 released;
-} button_state;
+} ButtonState;
 
 typedef struct {
-  button_state buttons[SDL_SCANCODE_COUNT];
-} input;
+  ButtonState buttons[SDL_SCANCODE_COUNT];
+} Input;
 
-#define sndplr_SPEED 200.0f
+#define sndplr_SPEED 800.0f
 #define sndplr_HALF_DIM 25.0f
+#define GRAVITY_SPEED 400.0f;
 
 #define make_ani(ani_array, delay) { .frames = ani_array, .num_frames = sizeof(ani_array) / sizeof(ani_array[0]), .duration = delay, .elapsed = 0., .cur_frame = 0 }
 #define LEN(arr) (sizeof(arr) / sizeof(arr[0]))
@@ -92,6 +96,28 @@ typedef struct {
   f64 elapsed;
   int cur_frame;
 } Animation;
+
+enum {
+  none     =  0,
+  deleted  = (1 << 0),
+  blocker  = (1 << 2),
+  animated = (1 << 3),
+};
+
+#define MAX_ENTITY_COUNT 128
+
+typedef struct {
+  v2 position;
+  v2 half_dim;
+} Entity;
+
+typedef struct {
+  u32 entity_count; //TODO(moritz): init to 1
+  Entity entities[2];
+  // SDL_FRect entities[2];
+  v2 player_velocity;
+  b8 player_is_grounded;
+} GameState;
 
 typedef struct {
   Animation *animations;
@@ -205,6 +231,41 @@ void sndplr_play_once(SoundPlayer *player) {
   SDL_ResumeAudioStreamDevice(player->audio_stream);
 }
 
+void draw_rect_thickness(SDL_Renderer *renderer, SDL_FRect *rect, f32 thickness)
+{
+  SDL_FRect top_rect = {
+    .x = rect->x,
+    .y = rect->y,
+    .w = rect->w,
+    .h = thickness
+  };
+  SDL_RenderFillRect(renderer, &top_rect);
+
+  SDL_FRect right_rect = {
+    .x = rect->x + rect->w - thickness,
+    .y = rect->y,
+    .w = thickness,
+    .h = rect->h
+  };
+  SDL_RenderFillRect(renderer, &right_rect);
+
+  SDL_FRect bot_rect = {
+    .x = rect->x,
+    .y = rect->y + rect->h - thickness,
+    .w = rect->w,
+    .h = thickness
+  };
+  SDL_RenderFillRect(renderer, &bot_rect);
+
+  SDL_FRect left_rect = {
+    .x = rect->x,
+    .y = rect->y,
+    .w = thickness,
+    .h = rect->h
+  };
+  SDL_RenderFillRect(renderer, &left_rect);
+}
+
 int main(int argc, char **argv)
 {
 
@@ -239,10 +300,12 @@ int main(int argc, char **argv)
   }
 
 
-  input previous_input = {0};
+  Input previous_input = {0};
 
-  v2 player_pos = {
-    .x = 400,
+  GameState game_state = {0};
+
+  v2 sndplr_pos = {
+    .x = 800,
     .y = 300
   };
 
@@ -264,6 +327,30 @@ int main(int argc, char **argv)
     .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_body.png"),
   };
   cat_ani.frame_dims = (v2) {1000.f, 1000.f};
+  sndplr_pos.x = cat_ani.position.x;
+  sndplr_pos.y = cat_ani.position.y;
+
+  game_state.entities[0] = (Entity){
+    .position = {
+      .x = sndplr_pos.x + 600.0f,
+      .y = sndplr_pos.y
+    },
+    .half_dim = {
+      .x = 50.0f,
+      .y = 100.0f
+    },
+  };
+
+  game_state.entities[1] = (Entity){
+    .position = {
+      .x = sndplr_pos.x + 900.0f,
+      .y = sndplr_pos.y
+    },
+    .half_dim = {
+      .x = 70.0f,
+      .y = 120.0f
+    },
+  };
 
   SDL_Log("Num anis: %d", cat_ani.num_anis);
   for(int i = 0; i < cat_ani.num_anis; ++i) {
@@ -303,12 +390,12 @@ int main(int argc, char **argv)
 
     sndplr_continue(&engine_snd);
     //NOTE(moritz): Events/Input
-    input current_input = {0};
+    Input current_input = {0};
     current_input = previous_input;
 
     for (s32 idx = 0; idx < SDL_SCANCODE_COUNT; idx += 1)
     {
-      button_state *state = &current_input.buttons[idx];
+      ButtonState *state = &current_input.buttons[idx];
       state->pressed  = false;
       state->released = false;
     }
@@ -351,10 +438,10 @@ int main(int argc, char **argv)
       input_direction.x -= 1.0f;
     if (current_input.buttons[SDL_SCANCODE_RIGHT].down)
       input_direction.x += 1.0f;
-    if (current_input.buttons[SDL_SCANCODE_UP].down)
-      input_direction.y -= 1.0f;
-    if (current_input.buttons[SDL_SCANCODE_DOWN].down)
-      input_direction.y += 1.0f;
+    // if (current_input.buttons[SDL_SCANCODE_UP].down)
+    //   input_direction.y -= 1.0f;
+    // if (current_input.buttons[SDL_SCANCODE_DOWN].down)
+    //   input_direction.y += 1.0f;
     if (current_input.buttons[SDL_SCANCODE_RETURN].down) {
       sndplr_play_once(&lazer_snd);
     }
@@ -366,8 +453,101 @@ int main(int argc, char **argv)
     input_direction.x *= one_over_input_length;
     input_direction.y *= one_over_input_length;
 
-    player_pos.x += input_direction.x*sndplr_SPEED*dt_for_previous_frame;
-    player_pos.y += input_direction.y*sndplr_SPEED*dt_for_previous_frame;
+    // sndplr_pos.x += input_direction.x*sndplr_SPEED*dt_for_previous_frame;
+    // sndplr_pos.y += input_direction.y*sndplr_SPEED*dt_for_previous_frame;
+    // sndplr_pos.y = 890 - ani_obj.spr_dims.y/2;
+
+    f32 run_acceleration_amount         = 0;
+    if (dt_for_previous_frame != 0.0f)
+      run_acceleration_amount         = sndplr_SPEED/(4.0f*dt_for_previous_frame);
+
+    f32 run_deacceleration_amount       = 0;
+    if (dt_for_previous_frame != 0.0f)
+      run_deacceleration_amount       = sndplr_SPEED/(2.0f*dt_for_previous_frame);
+    
+    // f32 air_control_deacceleration_amount = 0.25f*sndlpr_SPEED;
+
+    f32 acceleration_amount   = run_acceleration_amount;
+    f32 deacceleration_amount = run_deacceleration_amount;
+    if (!game_state.player_is_grounded)
+      acceleration_amount = sndplr_SPEED/(8.0f*dt_for_previous_frame);
+
+    game_state.player_velocity.x += input_direction.x*acceleration_amount*dt_for_previous_frame;
+
+    f32 vel_sign = 0;
+    if (game_state.player_velocity.x > 0)
+      vel_sign   =  1.0f;
+    if (game_state.player_velocity.x < 0)
+      vel_sign   = -1.0f;
+
+    f32 abs_vel_x = fabs(game_state.player_velocity.x);
+    if (abs_vel_x >= sndplr_SPEED)
+    {
+      game_state.player_velocity.x = sndplr_SPEED*vel_sign;
+    }
+
+    b8 any_move_input = current_input.buttons[SDL_SCANCODE_LEFT].down || current_input.buttons[SDL_SCANCODE_RIGHT].down;
+    if (!any_move_input)
+    {
+      f32 sub = MIN(run_deacceleration_amount, abs_vel_x/dt_for_previous_frame);
+      game_state.player_velocity.x -= vel_sign*sub*dt_for_previous_frame;
+    }
+
+    v2 player_desired_pos = sndplr_pos;
+    f32 p_delta_x = game_state.player_velocity.x*dt_for_previous_frame;
+
+    //NOTE(moritz): Scuffed collision detection attempt. DO NOT USE!!!
+    // f32 p_delta_abs = fabs(p_delta_x);
+    // // player_desired_pos.x += p_delta_x;
+
+    // //Raycast in movement direction
+    // // v2 test_box
+    // // f32 ray_dir = game_state.player_velocity.x/abs_vel_x;
+    // f32 t = 10000.0f;
+    // f32 ray_dir = 0.0f;
+    // if (game_state.player_velocity.x != 0.0f)
+    //   ray_dir = game_state.player_velocity.x/abs_vel_x;
+    // f32 ray_o   = sndplr_pos.x;
+    // f32 pen = 0;
+    // b8 intersecting = 0;
+    // if (ray_dir != 0.0f)
+    // {
+    //   for (int idx = 0; idx < 2; idx += 1)
+    //   {
+    //     Entity entity = game_state.entities[idx];
+    //     f32 test_half_dim = (entity.half_dim.x + ani_obj.spr_dims.x/2);
+    //     f32 test_a  = entity.position.x - test_half_dim;
+    //     f32 test_b  = entity.position.x + test_half_dim;
+
+    //     f32 t_a = (test_a - ray_o)/ray_dir;
+    //     f32 t_b = (test_b - ray_o)/ray_dir;
+
+    //     if (t_a >= 0.0f)
+    //       t = MIN(t, t_a);
+    //     if (t_b >= 0.0f)
+    //       t = MIN(t, t_b);
+
+    //     if ((t_a <= 0.0f && t_b >= 0.0f) ||
+    //         (t_b <= 0.0f && t_a >= 0.0f))
+    //     {
+    //       // inside = 1;
+    //       intersecting = 1; //is actually inside
+    //       sndplr_pos.x -= ray_dir*2.0f;
+    //       t = 0;
+    //     }
+    //   }
+
+    //   p_delta_abs = MIN(p_delta_abs, t);
+    // }
+    // p_delta_x = vel_sign*p_delta_abs;
+
+    // sndplr_pos.x += game_state.player_velocity.x*dt_for_previous_frame;
+    //NOTE(moritz): IDEA: Jerk back on punches
+    //NOTE(moritz): IDEA: Jerk back on punches
+    //NOTE(moritz): IDEA: Jerk back on punches
+    //NOTE(moritz): IDEA: Jerk back on punches
+    sndplr_pos.x += p_delta_x;
+    // sndplr_pos.y += player_desired_pos.y;
 
     //NOTE(moritz): Drawing
     if (bg_tex) {
@@ -379,6 +559,9 @@ int main(int argc, char **argv)
     }
 
     if(cat_ani.spr_tex) {
+      //NOTE(moritz): Hack
+      cat_ani.position.x = sndplr_pos.x;
+      cat_ani.position.y = sndplr_pos.y;
       //update_animation(&animations[0], dt_for_previous_frame);
       //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
       update_animated_object(&cat_ani, dt_for_previous_frame);
@@ -387,8 +570,8 @@ int main(int argc, char **argv)
     else {
       SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
       SDL_FRect rect = (SDL_FRect){
-        .x = player_pos.x - sndplr_HALF_DIM,
-        .y = player_pos.y - sndplr_HALF_DIM,
+        .x = sndplr_pos.x - sndplr_HALF_DIM,
+        .y = sndplr_pos.y - sndplr_HALF_DIM,
         .w = 2*sndplr_HALF_DIM,
         .h = 2*sndplr_HALF_DIM
       };
@@ -448,6 +631,59 @@ int main(int argc, char **argv)
       SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
       SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 1920, 205});
     }
+
+
+    //NOTE(moritz): Draw collision geo
+    // SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+
+    SDL_FRect belt_rect = {
+      .x = 0,
+      .y = 890,
+      .w = belt->w,
+      .h = belt->h
+    };
+    draw_rect_thickness(renderer, &belt_rect, 4);
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+    SDL_FRect player_rect = {
+      .x = sndplr_pos.x - cat_ani.display_dims.x/2,
+      .y = sndplr_pos.y - cat_ani.display_dims.y/2,
+      .w = cat_ani.display_dims.x,
+      .h = cat_ani.display_dims.y
+    };
+    draw_rect_thickness(renderer, &player_rect, 4);
+
+    // if (!intersecting)
+    // {
+      SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+    // }
+    // else
+    // {
+      // SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+    // }
+    // if (intersecting)
+
+    for (int idx = 0; idx < 2; idx += 1)
+    {
+      Entity entity = game_state.entities[idx];
+      SDL_FRect test_rect = {
+        .x = entity.position.x - entity.half_dim.x,
+        .y = entity.position.y - entity.half_dim.y,
+        .w = entity.half_dim.x*2.0f,
+        .h = entity.half_dim.y*2.0f
+      };
+      SDL_RenderFillRect(renderer, &test_rect);
+    }
+
+    // SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+    // f32 hit_p_x = ray_o + ray_dir*t;
+    // SDL_FRect hit_rect = {
+    //   .x = hit_p_x - 10.0f,
+    //   .y = sndplr_pos.y - 10.0f,
+    //   .w = 20.0f,
+    //   .h = 20.0f
+    // };
+    // SDL_RenderFillRect(renderer, &hit_rect);
 
     SDL_RenderPresent(renderer);
   }
