@@ -97,6 +97,20 @@ typedef struct {
   int cur_frame;
 } Animation;
 
+enum PROP_STATE {
+  WHOLE,
+  BROKEN
+};
+
+typedef struct {
+  int hp;
+  v2* frames;
+  enum PROP_STATE broken;
+  SDL_Texture* texture;
+  v2 frame_dims;
+  v2 position;
+} Prop;
+
 enum {
   none     =  0,
   deleted  = (1 << 0),
@@ -265,6 +279,59 @@ void draw_rect_thickness(SDL_Renderer *renderer, SDL_FRect *rect, f32 thickness)
   SDL_RenderFillRect(renderer, &left_rect);
 }
 
+enum PropType {
+  // LVL1
+  DUCK,
+  VASE,
+  TOSTER,
+  FLOWER,
+
+  // LVL2
+  LAMP,
+  PC,
+  PLANT,
+
+  // LVL3
+  STATUE,
+  MIRROR,
+  BEAR,
+
+  NUM_TYPES,
+};
+
+enum PropLvl {
+  SMALL,
+  MEDIUM,
+  LARGE
+};
+
+#define ENM_RAND_RNG(startenm, endenm) (assert((startenm) < (endenm)), (startenm) + (rand() % ((endenm) - (startenm))))
+// lvl from 0 to 2
+Prop rands_prop(enum PropLvl lvl, SDL_Texture** prop_texture_list) {
+
+  enum PropType type;
+  if (lvl == SMALL) {
+    type = ENM_RAND_RNG(DUCK, FLOWER);
+  } else if (lvl == MEDIUM) {
+    type = ENM_RAND_RNG(LAMP, PLANT);
+  } else if (lvl == LARGE) {
+    type = ENM_RAND_RNG(STATUE, BEAR);
+  }
+  v2 prop_frames[] = { {0, 0}, {1, 0} };
+  v2 start_pos = {0, 1000};
+  SDL_Texture* spr_tex = prop_texture_list[type];
+  Prop prop = {
+    .hp = lvl + 1,
+    .frames =  prop_frames,
+    .broken = (rand() % 2) == 0 ? false : true,
+    .texture = spr_tex,
+    .frame_dims = {spr_tex->w / 2, spr_tex->h},
+    .position = start_pos
+  };
+
+  return prop;
+}
+
 int main(int argc, char **argv)
 {
 
@@ -308,6 +375,38 @@ int main(int argc, char **argv)
     .y = 300
   };
 
+  v2 cat_pos = {180, 780};
+
+  v2 tail_frames[] = { {0, 0}, {1, 0}, {2, 0} };
+  Animation tails[] = {
+    make_ani(tail_frames, .6)
+  };
+  AnimatedObject cat_tail_obj = {
+    .animations = tails,
+    .num_anis = LEN(tails),
+    .cur_animation = 0,
+    .position = cat_pos,
+    .frame_dims = {1000.f, 1000.f},
+    .display_dims = {356.,  356.},
+    // TODO: free mem
+    .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_tail.png"),
+  };
+
+  v2 face_frames[] = { {0, 0}, {1, 0}, {2, 0} };
+  Animation faces[] = {
+    make_ani(face_frames, .6)
+  };
+  AnimatedObject cat_face_obj = {
+    .animations = faces,
+    .num_anis = LEN(faces),
+    .cur_animation = 0,
+    .position = cat_pos,
+    .frame_dims = {1000.f, 1000.f},
+    .display_dims = {356., 356.},
+    // TODO: free mem
+    .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_face.png"),
+  };
+
   v2   idle1[] = { {0, 0} };
   v2 attack1[] = { {0, 0}, {1, 0}, {2, 0} };
 
@@ -315,23 +414,11 @@ int main(int argc, char **argv)
     make_ani(idle1, .6),
     make_ani(attack1, .6),
   };
-
-  AnimatedObject cat_face_obj = {
-    .animations = animations,
-    .num_anis = LEN(animations),
-    .cur_animation = 1,
-    .position = {100, 780},
-    .frame_dims = {1001.f, 1001.f},
-    .display_dims = {356., 356.},
-    // TODO: free mem
-    .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_face.png"),
-  };
-
   AnimatedObject cat_ani = {
     .animations = animations,
     .num_anis = LEN(animations),
     .cur_animation = 1,
-    .position = {100, 780},
+    .position = cat_pos,
     .frame_dims = {1000.f, 1000.f},
     .display_dims = {356., 356.},
     // TODO: free mem
@@ -373,6 +460,20 @@ int main(int argc, char **argv)
   SDL_Texture *belt = load_tex_from_png(renderer, "../res/conveyorbelt_frontwheel1.png");
   SDL_Texture *wheels = load_tex_from_png(renderer, "../res/conveyorbelt_circle1.png");
   SDL_Texture *dot = load_tex_from_png(renderer, "../res/conveyorbelt_dot1.png");
+
+  SDL_Texture* prop_textures[NUM_TYPES];
+  for(int i = 0; i < NUM_TYPES; ++i) prop_textures[i] = NULL;
+
+  prop_textures[DUCK] = load_tex_from_png(renderer, "../res/item_duck.png");
+  prop_textures[VASE] = load_tex_from_png(renderer, "../res/item_vase.png");
+  prop_textures[TOSTER] = load_tex_from_png(renderer, "../res/item_toster.png");
+  prop_textures[FLOWER] = load_tex_from_png(renderer, "../res/item_flower.png");
+  prop_textures[LAMP] = load_tex_from_png(renderer, "../res/item_lamp.png");
+  prop_textures[PC] = load_tex_from_png(renderer, "../res/item_computer.png");
+  prop_textures[PLANT] = load_tex_from_png(renderer, "../res/item_plant.png");
+  prop_textures[STATUE] = load_tex_from_png(renderer, "../res/item_statue.png");
+  prop_textures[MIRROR] = load_tex_from_png(renderer, "../res/item_mirror.png");
+  prop_textures[BEAR] = load_tex_from_png(renderer, "../res/item_bear.png");
 
   u64 time_stamp_now  = SDL_GetPerformanceCounter();
   u64 time_stamp_last = 0;
@@ -464,6 +565,25 @@ int main(int argc, char **argv)
         .h = 2*sndplr_HALF_DIM
       };
       SDL_RenderFillRect(renderer, &rect);
+    }
+
+    if(cat_tail_obj.spr_tex) {
+      //NOTE(moritz): Hack
+      cat_ani.position.x = player_pos.x;
+      cat_ani.position.y = player_pos.y;
+      //update_animation(&animations[0], dt_for_previous_frame);
+      //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
+      display_animated_object(&cat_tail_obj, renderer);
+    }
+
+
+    if(cat_face_obj.spr_tex) {
+      //NOTE(moritz): Hack
+      cat_ani.position.x = player_pos.x;
+      cat_ani.position.y = player_pos.y;
+      //update_animation(&animations[0], dt_for_previous_frame);
+      //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
+      display_animated_object(&cat_face_obj, renderer);
     }
 
     if (spawn_bg) {
