@@ -373,13 +373,6 @@ int main(int argc, char **argv)
   SDL_Texture *wheels = load_tex_from_png(renderer, "../res/conveyorbelt_circle1.png");
   SDL_Texture *dot = load_tex_from_png(renderer, "../res/conveyorbelt_dot1.png");
 
-  SoundPlayer engine_snd;
-  sndplr_loadwav(&engine_snd, "../res/engine.wav");
-  sndplr_start(&engine_snd);
-
-  SoundPlayer lazer_snd;
-  sndplr_loadwav(&lazer_snd, "../res/lazer.wav");
-
   u64 time_stamp_now  = SDL_GetPerformanceCounter();
   u64 time_stamp_last = 0;
   f64 dt_for_previous_frame = 0;
@@ -398,7 +391,6 @@ int main(int argc, char **argv)
     dt_for_previous_frame = (f64)((time_stamp_now - time_stamp_last)/(f64)SDL_GetPerformanceFrequency());
     // SDL_Log("dt: %g seconds", dt_for_previous_frame);
 
-    sndplr_continue(&engine_snd);
     //NOTE(moritz): Events/Input
     Input current_input = {0};
     current_input = previous_input;
@@ -452,9 +444,6 @@ int main(int argc, char **argv)
     //   input_direction.y -= 1.0f;
     // if (current_input.buttons[SDL_SCANCODE_DOWN].down)
     //   input_direction.y += 1.0f;
-    if (current_input.buttons[SDL_SCANCODE_RETURN].down) {
-      sndplr_play_once(&lazer_snd);
-    }
 
     f32 one_over_input_length = input_direction.x*input_direction.x + input_direction.y*input_direction.y;
     if (one_over_input_length != 0.0)
@@ -697,9 +686,6 @@ int main(int argc, char **argv)
 
     SDL_RenderPresent(renderer);
   }
-
-  sndplr_destroy(&engine_snd);
-  sndplr_destroy(&lazer_snd);
 
   SDL_DestroyTexture(cat_ani.spr_tex);
   SDL_DestroyTexture(bg_tex);
