@@ -464,6 +464,7 @@ int main(int argc, char **argv)
   SDL_Texture* prop_textures[NUM_TYPES];
   for(int i = 0; i < NUM_TYPES; ++i) prop_textures[i] = NULL;
 
+  // TODO: free mem
   prop_textures[DUCK] = load_tex_from_png(renderer, "../res/item_duck.png");
   prop_textures[VASE] = load_tex_from_png(renderer, "../res/item_vase.png");
   prop_textures[TOSTER] = load_tex_from_png(renderer, "../res/item_toster.png");
