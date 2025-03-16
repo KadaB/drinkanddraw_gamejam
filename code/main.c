@@ -99,9 +99,10 @@ typedef struct {
   int cur_animation; // in welcher Animation sich der Spieler befindet.
 
   // TODO Kada: nur zu Testzwecken pointer
-  v2 *position;
+  v2 position;
 
-  v2 spr_dims;
+  v2 frame_dims;
+  v2 display_dims;
   SDL_Texture *spr_tex;
 } AnimatedObject;
 
@@ -139,7 +140,20 @@ void display_animation(v2 sndplr_pos, Animation *animation, v2 spr_dims, SDL_Tex
 }
 
 void display_animated_object(AnimatedObject* ani_obj, SDL_Renderer *renderer) {
-  display_animation(*ani_obj->position, &ani_obj->animations[ani_obj->cur_animation], ani_obj->spr_dims, ani_obj->spr_tex, renderer);
+  Animation *animation = &ani_obj->animations[ani_obj->cur_animation];
+  v2 frame_coord_on_grid = animation->frames[animation->cur_frame];
+  SDL_FRect srcRect = frame_at(frame_coord_on_grid, ani_obj->frame_dims);
+  v2 center = {ani_obj->display_dims.x/2, ani_obj->display_dims.y/2 };
+
+  SDL_FRect dst_spr_rect = {
+    .x = ani_obj->position.x - center.x,
+    .y = ani_obj->position.y - center.y,
+    .w = ani_obj->display_dims.x,
+    .h = ani_obj->display_dims.y
+  };
+
+  SDL_RenderTexture(renderer, ani_obj->spr_tex, &srcRect, &dst_spr_rect);
+
 }
 
 typedef struct {
@@ -227,7 +241,7 @@ int main(int argc, char **argv)
 
   input previous_input = {0};
 
-  v2 sndplr_pos = {
+  v2 player_pos = {
     .x = 400,
     .y = 300
   };
@@ -240,24 +254,28 @@ int main(int argc, char **argv)
     make_ani(attack1, .6),
   };
 
-  AnimatedObject ani_obj = {
+  AnimatedObject cat_ani = {
     .animations = animations,
     .num_anis = LEN(animations),
     .cur_animation = 1,
-    .position = &sndplr_pos,
-    .spr_dims = {364, 352},
-    .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_hit.png"),
+    .position = {100, 780},
+    // .frame_dims = {1001.f, 1001.f},
+    .display_dims = {356., 356.},
+    .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_body.png"),
   };
+  cat_ani.frame_dims = (v2) {1000.f, 1000.f};
 
-  SDL_Log("Num anis: %d", ani_obj.num_anis);
-  for(int i = 0; i < ani_obj.num_anis; ++i) {
+  SDL_Log("Num anis: %d", cat_ani.num_anis);
+  for(int i = 0; i < cat_ani.num_anis; ++i) {
     SDL_Log("animation %d: num of frames: %d",i, animations[i].num_frames);
   }
 
-  SDL_Texture *bg_tex = SDL_CreateTextureFromSurface(renderer, SDL_LoadBMP("../res/background.bmp"));
-  SDL_Texture *spawn = load_tex_from_png(renderer, "../res/item_spawn.png");
-  SDL_Texture *belt = load_tex_from_png(renderer, "../res/base_production_line.png");
-  SDL_Texture *wheels = load_tex_from_png(renderer, "../res/circles.png");
+  SDL_Texture *bg_tex = load_tex_from_png(renderer, "../res/background_nolight1.png");
+  SDL_Texture *spawn = load_tex_from_png(renderer, "../res/conveyorbelt_static1.png");
+  SDL_Texture *spawn_bg = load_tex_from_png(renderer, "../res/conveyorbelt_interior.png");
+  SDL_Texture *belt = load_tex_from_png(renderer, "../res/conveyorbelt_frontwheel1.png");
+  SDL_Texture *wheels = load_tex_from_png(renderer, "../res/conveyorbelt_circle1.png");
+  SDL_Texture *dot = load_tex_from_png(renderer, "../res/conveyorbelt_dot1.png");
 
   SoundPlayer engine_snd;
   sndplr_loadwav(&engine_snd, "../res/engine.wav");
@@ -274,6 +292,8 @@ int main(int argc, char **argv)
   b8 quit = false;
 
   int angle = 0.f;
+  f32 dot_shift = 0;
+
   while (!quit)
   {
     time_stamp_last = time_stamp_now;
@@ -346,8 +366,8 @@ int main(int argc, char **argv)
     input_direction.x *= one_over_input_length;
     input_direction.y *= one_over_input_length;
 
-    sndplr_pos.x += input_direction.x*sndplr_SPEED*dt_for_previous_frame;
-    sndplr_pos.y += input_direction.y*sndplr_SPEED*dt_for_previous_frame;
+    player_pos.x += input_direction.x*sndplr_SPEED*dt_for_previous_frame;
+    player_pos.y += input_direction.y*sndplr_SPEED*dt_for_previous_frame;
 
     //NOTE(moritz): Drawing
     if (bg_tex) {
@@ -358,33 +378,35 @@ int main(int argc, char **argv)
       SDL_RenderClear(renderer);
     }
 
-    if(ani_obj.spr_tex) {
+    if(cat_ani.spr_tex) {
       //update_animation(&animations[0], dt_for_previous_frame);
       //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
-      update_animated_object(&ani_obj, dt_for_previous_frame);
-      display_animated_object(&ani_obj, renderer);
+      update_animated_object(&cat_ani, dt_for_previous_frame);
+      display_animated_object(&cat_ani, renderer);
     }
     else {
       SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
       SDL_FRect rect = (SDL_FRect){
-        .x = sndplr_pos.x - sndplr_HALF_DIM,
-        .y = sndplr_pos.y - sndplr_HALF_DIM,
+        .x = player_pos.x - sndplr_HALF_DIM,
+        .y = player_pos.y - sndplr_HALF_DIM,
         .w = 2*sndplr_HALF_DIM,
         .h = 2*sndplr_HALF_DIM
       };
       SDL_RenderFillRect(renderer, &rect);
     }
 
-    if (belt) {
-      SDL_RenderTexture(renderer, belt, NULL, &(SDL_FRect){0, 890, belt->w, belt->h});
+    if (spawn_bg) {
+      SDL_RenderTexture(renderer, spawn_bg, NULL, &(SDL_FRect){0, 0, spawn_bg->w, spawn_bg->h});
     }
     else {
-      SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-      SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 1920, 205});
+      SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
+      SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 400, 400});
     }
 
+    // item placing
+
     if (spawn) {
-      SDL_RenderTexture(renderer, spawn, NULL, &(SDL_FRect){1820 - (spawn->w/2), -275, spawn->w, spawn->h});
+      SDL_RenderTexture(renderer, spawn, NULL, &(SDL_FRect){0, 0, spawn->w, spawn->h});
     }
     else {
       SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
@@ -392,13 +414,39 @@ int main(int argc, char **argv)
     }
 
     if (wheels) {
-      SDL_FPoint center = {wheels->w/2, wheels->h/2};
-      angle += 180. * dt_for_previous_frame;
-      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*2, 908, wheels->w, wheels->h}, angle, &center, SDL_FLIP_NONE);
-      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*4, 908, wheels->w, wheels->h}, angle, &center, SDL_FLIP_NONE);
+      SDL_FPoint center = {wheels->w/2 + rand_minus_one_to_one(), wheels->h/2 + rand_minus_one_to_one()};
+      f32 posxs[] = {98, 300, 490, 664, 827, 1026, 1219, 1432};
+      angle -= 290. * dt_for_previous_frame;
+      // angle = angle < 0 ? 360 : 0;
+      for (int i = 0; i < LEN(posxs); i++)
+        SDL_RenderTextureRotated(renderer, wheels, NULL,
+          &(SDL_FRect){posxs[i] - center.x, 990 - center.y, wheels->w, wheels->h}, angle, &center, SDL_FLIP_NONE);
+    }
 
-      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*12, 908, wheels->w, wheels->h},angle, &center, SDL_FLIP_NONE);
-      SDL_RenderTextureRotated(renderer, wheels, NULL, &(SDL_FRect){wheels->w*14, 908, wheels->w, wheels->h}, angle, &center, SDL_FLIP_NONE);
+    if (dot) {
+      int num_dots = 17;
+      SDL_FPoint center = {dot->w/2 + rand_minus_one_to_one(), dot->h/2 + rand_minus_one_to_one()};
+      dot_shift += 100 * dt_for_previous_frame;
+      f32 spacing = 100;
+      dot_shift = dot_shift > spacing ? 0.0 : dot_shift;
+      for (int i = 0; i < num_dots; i++) {
+        SDL_FRect dest_rect = { -dot_shift + i*spacing - center.x, 944 - center.y, dot->w, dot->h};
+        SDL_RenderTexture(renderer, dot, NULL, &dest_rect);
+      }
+
+      for (int i = 0; i < num_dots; i++) {
+        SDL_FRect dest_rect = { dot_shift + (i-1)*spacing - center.x, 1032 - center.y, dot->w, dot->h};
+        SDL_RenderTexture(renderer, dot, NULL, &dest_rect);
+      }
+    }
+
+
+    if (belt) {
+      SDL_RenderTexture(renderer, belt, NULL, &(SDL_FRect){0, 0, belt->w, belt->h});
+    }
+    else {
+      SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+      SDL_RenderFillRect(renderer, &(SDL_FRect){0, 890, 1920, 205});
     }
 
     SDL_RenderPresent(renderer);
@@ -407,7 +455,7 @@ int main(int argc, char **argv)
   sndplr_destroy(&engine_snd);
   sndplr_destroy(&lazer_snd);
 
-  SDL_DestroyTexture(ani_obj.spr_tex);
+  SDL_DestroyTexture(cat_ani.spr_tex);
   SDL_DestroyTexture(bg_tex);
   SDL_DestroyTexture(spawn);
   SDL_DestroyTexture(belt);
