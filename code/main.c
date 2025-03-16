@@ -303,7 +303,7 @@ int main(int argc, char **argv)
 
   GameState game_state = {0};
 
-  v2 sndplr_pos = {
+  v2 player_pos = {
     .x = 800,
     .y = 300
   };
@@ -323,6 +323,7 @@ int main(int argc, char **argv)
     .position = {100, 780},
     .frame_dims = {1001.f, 1001.f},
     .display_dims = {356., 356.},
+    // TODO: free mem
     .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_face.png"),
   };
 
@@ -333,16 +334,16 @@ int main(int argc, char **argv)
     .position = {100, 780},
     .frame_dims = {1000.f, 1000.f},
     .display_dims = {356., 356.},
+    // TODO: free mem
     .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_body.png"),
   };
-  cat_ani.frame_dims = (v2) {1000.f, 1000.f};
-  sndplr_pos.x = cat_ani.position.x;
-  sndplr_pos.y = cat_ani.position.y;
+  player_pos.x = cat_ani.position.x;
+  player_pos.y = cat_ani.position.y;
 
   game_state.entities[0] = (Entity){
     .position = {
-      .x = sndplr_pos.x + 600.0f,
-      .y = sndplr_pos.y
+      .x = player_pos.x + 600.0f,
+      .y = player_pos.y
     },
     .half_dim = {
       .x = 50.0f,
@@ -352,8 +353,8 @@ int main(int argc, char **argv)
 
   game_state.entities[1] = (Entity){
     .position = {
-      .x = sndplr_pos.x + 900.0f,
-      .y = sndplr_pos.y
+      .x = player_pos.x + 900.0f,
+      .y = player_pos.y
     },
     .half_dim = {
       .x = 70.0f,
@@ -447,8 +448,8 @@ int main(int argc, char **argv)
 
     if(cat_ani.spr_tex) {
       //NOTE(moritz): Hack
-      cat_ani.position.x = sndplr_pos.x;
-      cat_ani.position.y = sndplr_pos.y;
+      cat_ani.position.x = player_pos.x;
+      cat_ani.position.y = player_pos.y;
       //update_animation(&animations[0], dt_for_previous_frame);
       //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
       update_animated_object(&cat_ani, dt_for_previous_frame);
@@ -457,8 +458,8 @@ int main(int argc, char **argv)
     else {
       SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
       SDL_FRect rect = (SDL_FRect){
-        .x = sndplr_pos.x - sndplr_HALF_DIM,
-        .y = sndplr_pos.y - sndplr_HALF_DIM,
+        .x = player_pos.x - sndplr_HALF_DIM,
+        .y = player_pos.y - sndplr_HALF_DIM,
         .w = 2*sndplr_HALF_DIM,
         .h = 2*sndplr_HALF_DIM
       };
