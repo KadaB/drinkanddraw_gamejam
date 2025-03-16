@@ -350,6 +350,28 @@ void display_prop(Prop *prop, SDL_Renderer *renderer) {
   SDL_RenderTexture(renderer, prop->texture, &srcRect, &spr_rect);
 }
 
+char *make_path(char *buffer, s32 buffer_size, char *string_a, char *string_b)
+{
+  SDL_memset(buffer, 0, buffer_size);
+
+  s32 chars_written = 0;
+  char *char_at = string_a;
+  while(*char_at)
+  {
+    SDL_assert(chars_written < buffer_size);
+    buffer[chars_written++] = *char_at++;
+  }
+
+  char_at = string_b;
+  while(*char_at)
+  {
+    SDL_assert(chars_written < buffer_size);
+    buffer[chars_written++] = *char_at++;
+  }
+
+  return buffer;
+}
+
 int main(int argc, char **argv)
 {
 
@@ -359,6 +381,11 @@ int main(int argc, char **argv)
     SDL_Log("Could not initialize SDL: %s", SDL_GetError());
     return 1;
   }
+
+  const char *base_path = SDL_GetBasePath();
+  SDL_Log("%s", base_path);
+
+  char path_temp_buffer[256];
 
   SDL_Window *main_window = SDL_CreateWindow("SDL Window",
                                              1920,
