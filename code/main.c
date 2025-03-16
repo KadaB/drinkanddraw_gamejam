@@ -705,10 +705,17 @@ int main(int argc, char **argv)
       if (prop->alive) {
         prop->position.x -= dt_for_previous_frame * 300;
         display_prop(prop, renderer);
-        if (prop->position.x < 0) {
+        if (prop->position.x < -prop->texture->w) {
           prop->alive = false;
           num_props_alive--;
         }
+        else if (prop->position.x < cat_ani.position.x + cat_ani.display_dims.x
+          && cat_ani.cur_animation == PUNCH) {
+          SDL_Log("Punch distance!");
+          prop->hp--;
+          if (prop->hp <= 0) prop->alive = false;
+        }
+
       }
     }
 
