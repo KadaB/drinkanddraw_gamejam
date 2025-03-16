@@ -134,6 +134,12 @@ typedef struct {
   b8 player_is_grounded;
 } GameState;
 
+typedef enum {
+  IDLE,
+  PUNCH
+}  CatAnimation;
+
+
 typedef struct {
   Animation *animations;
   int num_anis;
@@ -143,26 +149,32 @@ typedef struct {
   v2 frame_dims;
   v2 display_dims;
 
+  b8 loop;
+
   SDL_Texture *spr_tex;
 } AnimatedObject;
 
-// returns true if animation not yet ended?
+// returns true if animation ended?
 b8 update_animation(Animation *animation, f64 elapsed_delta_sec) {
   animation->elapsed += elapsed_delta_sec;
 
   if(animation->elapsed > animation->duration) {
     animation->cur_frame++;
-    if(animation->cur_frame >= animation->num_frames) animation->cur_frame = 0;
     animation->elapsed = 0.f;
-    return false;
+    if(animation->cur_frame >= animation->num_frames) {
+      animation->cur_frame = 0;
+      return true;
+    }
   }
-  return true;
+  return false;
 }
 
 
 void update_animated_object(AnimatedObject* ani_obj, f64 elapsed_delta_sec) {
-  if(!update_animation(&ani_obj->animations[ani_obj->cur_animation], elapsed_delta_sec)) {
+  if(update_animation(&ani_obj->animations[ani_obj->cur_animation], elapsed_delta_sec)) {
     //ani_obj->cur_animation = (ani_obj->cur_animation+1) % ani_obj->num_anis;
+    ani_obj->cur_animation = 0;
+    //ani_objanimation->cur_frame++;
   }
 }
 
@@ -372,6 +384,15 @@ char *make_path(char *buffer, s32 buffer_size, char *string_a, char *string_b)
   return buffer;
 }
 
+void animation_obj_start(AnimatedObject *ani_obj, CatAnimation set_animation) {
+  ani_obj->animations[ani_obj->cur_animation].cur_frame = 0;
+  ani_obj->animations[ani_obj->cur_animation].elapsed = 0;
+
+  ani_obj->cur_animation = set_animation;
+  ani_obj->animations[ani_obj->cur_animation].cur_frame = 0;
+  ani_obj->animations[ani_obj->cur_animation].elapsed = 0;
+}
+
 int main(int argc, char **argv)
 {
 
@@ -453,16 +474,17 @@ int main(int argc, char **argv)
   };
 
   v2   idle1[] = { {0, 0} };
-  v2 attack1[] = { {0, 0}, {1, 0}, {2, 0} };
+  v2 attack1[] = {{1, 0}, {2, 0}};
 
   Animation animations[] = {
     make_ani(idle1, .6),
-    make_ani(attack1, .6),
+    make_ani(attack1, .05),
   };
+
   AnimatedObject cat_ani = {
     .animations = animations,
     .num_anis = LEN(animations),
-    .cur_animation = 1,
+    .cur_animation = 0,
     .position = cat_pos,
     .frame_dims = {1000.f, 1000.f},
     .display_dims = {356., 356.},
@@ -562,7 +584,7 @@ int main(int argc, char **argv)
           if (prop_list[i].alive == false) free_spot = i;
 
         if (free_spot > -1 && free_spot < prop_spawn_limit) {
-          prop_list[free_spot] = create_prop_rand(0, prop_textures);
+          prop_list[free_spot] = create_prop_rand(rand() % 3, prop_textures);
           num_props_alive++;
         }
       }
@@ -610,12 +632,10 @@ int main(int argc, char **argv)
 
     previous_input = current_input;
 
-    if (current_input.buttons[SDL_SCANCODE_LEFT].down)
-      myprop = create_prop_rand(0, prop_textures);
-    if (current_input.buttons[SDL_SCANCODE_DOWN].down)
-      myprop = create_prop_rand(1, prop_textures);
-    if (current_input.buttons[SDL_SCANCODE_RIGHT].down)
-      myprop = create_prop_rand(2, prop_textures);
+    if (current_input.buttons[SDL_SCANCODE_SPACE].down)
+      //myprop = create_prop_rand(2, prop_textures);
+        animation_obj_start(&cat_ani, PUNCH);
+
 
     //NOTE(moritz):Update game state
     v2 input_direction = {0};
@@ -628,6 +648,18 @@ int main(int argc, char **argv)
       SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
       SDL_RenderClear(renderer);
     }
+
+
+    if(cat_tail_obj.spr_tex) {
+      //NOTE(moritz): Hack
+      cat_ani.position.x = player_pos.x;
+      cat_ani.position.y = player_pos.y;
+      //update_animation(&animations[0], dt_for_previous_frame);
+      //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
+      display_animated_object(&cat_tail_obj, renderer);
+      update_animated_object(&cat_tail_obj, dt_for_previous_frame);
+    }
+
 
     if(cat_ani.spr_tex) {
       //NOTE(moritz): Hack
@@ -648,16 +680,6 @@ int main(int argc, char **argv)
       };
       SDL_RenderFillRect(renderer, &rect);
     }
-
-    if(cat_tail_obj.spr_tex) {
-      //NOTE(moritz): Hack
-      cat_ani.position.x = player_pos.x;
-      cat_ani.position.y = player_pos.y;
-      //update_animation(&animations[0], dt_for_previous_frame);
-      //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
-      display_animated_object(&cat_tail_obj, renderer);
-    }
-
 
     if(cat_face_obj.spr_tex) {
       //NOTE(moritz): Hack
