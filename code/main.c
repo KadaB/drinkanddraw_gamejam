@@ -108,6 +108,7 @@ typedef struct {
   enum PROP_STATE broken;
   SDL_Texture* texture;
   v2 frame_dims;
+  v2 display_dims;
   v2 position;
   bool alive;
 } Prop;
@@ -318,29 +319,39 @@ enum PropLvl {
   LARGE
 };
 
-#define ENM_RAND_RNG(startenm, endenm) (assert((startenm) < (endenm)), (startenm) + (rand() % ((endenm) - (startenm))))
+#define ENM_RAND_RNG(startenm, endenm) (assert((startenm) < (endenm)), (startenm) + (rand() % ((endenm) - (startenm) +1)))
 // lvl from 0 to 2
 Prop create_prop_rand(enum PropLvl lvl, SDL_Texture** prop_texture_list) {
   enum PropType type;
   if (lvl == SMALL) {
-    int rnd = rand();
-    type = DUCK + rand() % (FLOWER - DUCK);//ENM_RAND_RNG(DUCK, FLOWER);
-    SDL_Log("Rand: %d", rnd);
-    SDL_Log("range: %d", (FLOWER - DUCK));
-    SDL_Log("Type nr: %d", type);
+    type = ENM_RAND_RNG(DUCK, FLOWER);
   } else if (lvl == MEDIUM) {
     type = ENM_RAND_RNG(LAMP, PLANT);
   } else if (lvl == LARGE) {
     type = ENM_RAND_RNG(STATUE, BEAR);
   }
 
+  f32 scale = 1.f;
+
+  switch (type) {
+    case LAMP:
+      scale = 0.85f;  break;
+    case MIRROR:
+      scale = 0.9f;  break;
+    case BEAR:
+      scale = 1.f;  break;
+    case STATUE:
+      scale = 0.71f;  break;
+  }
+
   v2 start_pos = {1900, 940};
   SDL_Texture* spr_tex = prop_texture_list[type];
   Prop prop = {
     .hp = lvl + 1,
-    .broken = (rand() % 2) == 0 ? false : true,
+    .broken = WHOLE,//(rand() % 2) == 0,
     .texture = spr_tex,
     .frame_dims = {spr_tex->w / 2, spr_tex->h},
+    .display_dims = {spr_tex->w/2 * scale , spr_tex->h *  scale},
     .position = start_pos,
     .alive = true
   };
@@ -353,10 +364,10 @@ void display_prop(Prop *prop, SDL_Renderer *renderer) {
 
 
   SDL_FRect spr_rect = (SDL_FRect) {
-    .x = prop->position.x - prop->frame_dims.x/2,
-    .y = prop->position.y - prop->frame_dims.y,
-    .w = prop->frame_dims.x,
-    .h = prop->frame_dims.y
+    .x = prop->position.x - prop->display_dims.x/2,
+    .y = prop->position.y - prop->display_dims.y,
+    .w = prop->display_dims.x,
+    .h = prop->display_dims.y
   };
 
   SDL_RenderTexture(renderer, prop->texture, &srcRect, &spr_rect);
@@ -458,9 +469,14 @@ int main(int argc, char **argv)
     .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_tail.png"),
   };
 
-  v2 face_frames[] = { {0, 0}, {1, 0}, {2, 0} };
+  v2 ok_face[] = { {0, 0} };
+  v2 idle_face[] = {  {1, 0} };
+  v2 bad_face[] = { {2, 0} };
+
   Animation faces[] = {
-    make_ani(face_frames, .6)
+    make_ani(idle_face, .6),
+    make_ani(ok_face, .6),
+    make_ani(bad_face, .6)
   };
   AnimatedObject cat_face_obj = {
     .animations = faces,
@@ -685,8 +701,8 @@ int main(int argc, char **argv)
       //NOTE(moritz): Hack
       cat_ani.position.x = player_pos.x;
       cat_ani.position.y = player_pos.y;
-      //update_animation(&animations[0], dt_for_previous_frame);
-      //display_animation(sndplr_pos, &animations[0], spr_dims, spr_tex, renderer);
+      //update_animation(&animations, dt_for_previous_frame);
+      update_animated_object(&cat_face_obj, dt_for_previous_frame);
       display_animated_object(&cat_face_obj, renderer);
     }
 
@@ -708,8 +724,11 @@ int main(int argc, char **argv)
         if (prop->position.x < -prop->texture->w) {
           prop->alive = false;
           num_props_alive--;
+
+          cat_face_obj.cur_animation = prop->broken == BROKEN ? 2 : 1;
         }
         else if (cat_ani.position.x + cat_ani.display_dims.x > prop->position.x
+          && cat_ani.position.x + cat_ani.display_dims.x < prop->position.x + prop->texture->w/2
           && cat_ani.cur_animation == PUNCH) {
           SDL_Log("Punch distance!");
           prop->hp--;
