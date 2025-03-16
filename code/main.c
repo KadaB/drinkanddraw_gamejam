@@ -709,7 +709,7 @@ int main(int argc, char **argv)
           prop->alive = false;
           num_props_alive--;
         }
-        else if (prop->position.x < cat_ani.position.x + cat_ani.display_dims.x
+        else if (cat_ani.position.x + cat_ani.display_dims.x > prop->position.x
           && cat_ani.cur_animation == PUNCH) {
           SDL_Log("Punch distance!");
           prop->hp--;
@@ -740,7 +740,7 @@ int main(int argc, char **argv)
     if (dot) {
       int num_dots = 17;
       SDL_FPoint center = {dot->w/2 + rand_minus_one_to_one(), dot->h/2 + rand_minus_one_to_one()};
-      dot_shift += 100 * dt_for_previous_frame;
+      dot_shift += 300 * dt_for_previous_frame;
       f32 spacing = 100;
       dot_shift = dot_shift > spacing ? 0.0 : dot_shift;
       for (int i = 0; i < num_dots; i++) {
