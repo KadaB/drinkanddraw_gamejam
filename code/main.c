@@ -124,11 +124,10 @@ typedef struct {
   int num_anis;
   int cur_animation; // in welcher Animation sich der Spieler befindet.
 
-  // TODO Kada: nur zu Testzwecken pointer
   v2 position;
-
   v2 frame_dims;
   v2 display_dims;
+
   SDL_Texture *spr_tex;
 } AnimatedObject;
 
@@ -194,7 +193,7 @@ void sndplr_destroy(SoundPlayer *player) {
   SDL_zerop(player);
 }
 
-b8 sndplr_loadwav(SoundPlayer *player, char *filename) {
+bool sndplr_loadwav(SoundPlayer *player, char *filename) {
   SDL_AudioSpec wave_spec = {0, 0, 0};
   if (!SDL_LoadWAV(filename, &wave_spec, &player->wave_buf, &player->wave_len)) {
     SDL_Log("Audio datei NICHT geladen, weil: %s", SDL_GetError());
@@ -317,12 +316,22 @@ int main(int argc, char **argv)
     make_ani(attack1, .6),
   };
 
+  AnimatedObject cat_face_obj = {
+    .animations = animations,
+    .num_anis = LEN(animations),
+    .cur_animation = 1,
+    .position = {100, 780},
+    .frame_dims = {1001.f, 1001.f},
+    .display_dims = {356., 356.},
+    .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_face.png"),
+  };
+
   AnimatedObject cat_ani = {
     .animations = animations,
     .num_anis = LEN(animations),
     .cur_animation = 1,
     .position = {100, 780},
-    // .frame_dims = {1001.f, 1001.f},
+    .frame_dims = {1000.f, 1000.f},
     .display_dims = {356., 356.},
     .spr_tex = load_tex_from_png(renderer, "../res/cat_animation_body.png"),
   };
@@ -380,6 +389,7 @@ int main(int argc, char **argv)
 
   int angle = 0.f;
   f32 dot_shift = 0;
+
 
   while (!quit)
   {
@@ -464,7 +474,7 @@ int main(int argc, char **argv)
     f32 run_deacceleration_amount       = 0;
     if (dt_for_previous_frame != 0.0f)
       run_deacceleration_amount       = sndplr_SPEED/(2.0f*dt_for_previous_frame);
-    
+
     // f32 air_control_deacceleration_amount = 0.25f*sndlpr_SPEED;
 
     f32 acceleration_amount   = run_acceleration_amount;
